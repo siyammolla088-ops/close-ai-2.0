@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Close AI</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b57d0">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;600;700&family=Google+Sans+Text:wght@300;400;500;700&family=Google+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f0f4f9;
+  --white:#ffffff;
+  --s1:#e9eef6;
+  --s2:#dde3ea;
+  --s3:#c4c7c5;
+  --border:rgba(0,0,0,0.12);
+  --border2:rgba(0,0,0,0.08);
+  --tp:#1f1f1f;
+  --ts:#444746;
+  --td:#747775;
+  --blue:#0b57d0;
+  --hover:rgba(0,0,0,0.06);
+  --active:rgba(0,0,0,0.1);
+  --g1:#4285f4;--g2:#9b59b6;--g3:#e91e8c;--g4:#f4b400;
+  --grad:linear-gradient(90deg,#4285f4,#9b59b6,#e91e8c,#f4b400);
+  --fw:'Google Sans Text','Google Sans',sans-serif;
+  --fd:'Google Sans',sans-serif;
+  --fm:'Google Sans Mono','Courier New',monospace;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tp);font-family:var(--fw)}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:299;opacity:0;pointer-events:none;transition:opacity .3s}
+.scrim.on{opacity:1;pointer-events:all}
+
+/* SIDEBAR */
+.sidebar{position:fixed;left:0;top:0;width:300px;height:100vh;background:var(--bg);display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:300;box-shadow:2px 0 12px rgba(0,0,0,.15)}
+.sidebar.open{transform:translateX(0)}
+.sb-top{display:flex;align-items:center;height:64px;padding:0 8px;gap:4px;flex-shrink:0}
+.sb-ham{width:48px;height:48px;border:none;background:none;cursor:pointer;color:var(--tp);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.sb-ham:hover{background:var(--hover)}
+.sb-name{font-family:var(--fd);font-size:18px;font-weight:400;color:var(--tp);padding-left:4px}
+.new-chat-sb{margin:4px 12px 8px;height:40px;border:none;background:none;color:var(--tp);border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 16px;cursor:pointer;font-family:var(--fw);font-size:14px;font-weight:500;transition:background .15s;white-space:nowrap}
+.new-chat-sb:hover{background:var(--hover)}
+.sb-lbl{padding:12px 16px 4px;font-size:11px;font-weight:500;color:var(--td);letter-spacing:.8px;text-transform:uppercase}
+.hist-list{flex:1;overflow-y:auto;padding:0 8px}
+.hist-list::-webkit-scrollbar{width:4px}
+.hist-list::-webkit-scrollbar-thumb{background:var(--s3);border-radius:4px}
+.hi{display:flex;align-items:center;gap:12px;padding:10px 10px 10px 14px;border-radius:24px;cursor:pointer;color:var(--tp);font-size:14px;transition:background .15s;min-height:44px;position:relative;user-select:none;-webkit-user-select:none}
+.hi:hover{background:var(--hover)}
+.hi.active{background:var(--s1)}
+.hi-txt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hi-del{opacity:0;background:none;border:none;cursor:pointer;color:var(--td);padding:4px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:opacity .15s;flex-shrink:0}
+.hi-del svg { pointer-events: none; }
+.hi:hover .hi-del{opacity:1}
+.hi-del:hover{background:var(--active)}
+.sb-bot{padding:8px;border-top:1px solid var(--border2)}
+.sbi{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:24px;cursor:pointer;color:var(--ts);font-size:14px;transition:background .15s,color .15s}
+.sbi:hover{background:var(--hover);color:var(--tp)}
+
+/* MAIN */
+.main{height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+.topbar{height:64px;display:flex;align-items:center;padding:0 8px;gap:0;flex-shrink:0;background:var(--bg)}
+.ham{width:48px;height:48px;border:none;background:none;cursor:pointer;color:var(--tp);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0}
+.ham:hover{background:var(--hover)}
+.tb-center{flex:1;text-align:center;font-family:var(--fd);font-size:18px;font-weight:400;color:var(--tp)}
+.tb-right{display:flex;align-items:center;gap:8px;padding-right:8px}
+.ib{width:40px;height:40px;border:none;background:none;cursor:pointer;color:var(--ts);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.ib:hover{background:var(--hover);color:var(--tp)}
+.login-btn{height:36px;padding:0 18px;border-radius:20px;border:none;background:#0b57d0;color:#fff;font-family:var(--fw);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s}
+.login-btn:hover{background:#1a6fe8}
+.login-btn.logged{background:linear-gradient(135deg,#4285f4,#9b59b6);width:36px;height:36px;padding:0;border-radius:50%;font-size:15px;font-family:var(--fd)}
+
+/* AUTH MODAL */
+.auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}
+.auth-overlay.show{display:flex}
+.auth-modal{background:#fff;border-radius:24px;padding:32px 28px;max-width:380px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.25);position:relative}
+.auth-title{font-family:var(--fd);font-size:22px;font-weight:500;margin-bottom:20px;text-align:center;color:var(--tp)}
+.auth-tabs{display:flex;background:var(--s1);border-radius:20px;padding:4px;margin-bottom:20px}
+.auth-tab{flex:1;text-align:center;padding:8px;border-radius:16px;cursor:pointer;font-size:14px;font-weight:500;color:var(--td);transition:.15s}
+.auth-tab.active{background:#fff;color:var(--tp);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.auth-field{width:100%;padding:12px 16px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;font-size:14px;font-family:var(--fw);outline:none;color:var(--tp)}
+.auth-field:focus{border-color:#0b57d0}
+.auth-btn{width:100%;padding:12px;border-radius:20px;border:none;background:#0b57d0;color:#fff;font-size:14px;font-weight:500;cursor:pointer;margin-bottom:10px;font-family:var(--fw)}
+.auth-btn:hover{background:#1a6fe8}
+.auth-btn:disabled{opacity:.6;cursor:default}
+.auth-google{width:100%;padding:12px;border-radius:20px;border:1px solid var(--border);background:#fff;color:var(--tp);font-size:14px;font-weight:500;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--fw)}
+.auth-google:hover{background:var(--s1)}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--td);font-size:12px}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border2)}
+.auth-guest{text-align:center;font-size:13px;color:var(--td);cursor:pointer;margin-top:6px;text-decoration:underline}
+.auth-err{font-size:13px;margin-bottom:10px;display:none;line-height:1.5}
+.auth-close{position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:var(--td);width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
+.auth-close:hover{background:var(--hover)}
+
+/* CHAT AREA */
+.chat-area{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.welcome{flex:1;display:flex;flex-direction:column;padding:28px 20px 16px;overflow-y:auto}
+.w-hi{font-family:var(--fd);font-size:22px;font-weight:400;color:var(--ts);margin-bottom:2px}
+.w-title{font-family:var(--fd);font-size:28px;font-weight:400;color:var(--tp);margin-bottom:28px}
+.star-wrap{display:flex;margin-bottom:20px}
+@keyframes starSpin{0%,100%{transform:scale(1) rotate(0deg)}50%{transform:scale(1.12) rotate(8deg)}}
+.star-svg{animation:starSpin 5s ease-in-out infinite}
+.chips{display:flex;flex-direction:column;gap:10px;max-width:340px}
+.chip{background:var(--white);border:none;border-radius:24px;padding:14px 20px;cursor:pointer;font-size:14px;color:var(--tp);font-family:var(--fw);text-align:left;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.1);transition:background .15s,box-shadow .15s}
+.chip:hover{background:var(--s1);box-shadow:0 2px 8px rgba(0,0,0,.14)}
+
+/* MSGS */
+.msgs-wrap{flex:1;overflow-y:auto;overflow-x:hidden;display:none;background:var(--bg)}
+.msgs-wrap::-webkit-scrollbar{width:4px}
+.msgs-wrap::-webkit-scrollbar-thumb{background:var(--s3);border-radius:4px}
+.msgs-inner{max-width:720px;margin:0 auto;padding:12px 16px 20px;display:flex;flex-direction:column;gap:2px}
+.mb{animation:fu .22s ease}
+@keyframes fu{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+.mu{display:flex;justify-content:flex-end;margin:8px 0 4px}
+.mu-bub{background:var(--s1);border-radius:20px 20px 4px 20px;padding:12px 18px;max-width:80%;font-size:15px;line-height:1.6;color:var(--tp);word-break:break-word}
+
+.mm{display:flex;gap:12px;margin:12px 0 4px;align-items:flex-start}
+.mm-icon{width:28px;height:28px;flex-shrink:0;margin-top:2px}
+.mm-body{flex:1;min-width:0}
+.mm-txt{font-size:15px;line-height:1.75;color:var(--tp);word-break:break-word}
+.mm-txt p{margin-bottom:10px}
+.mm-txt p:last-child{margin-bottom:0}
+.mm-txt strong{color:#1f1f1f;font-weight:600}
+.mm-txt em{font-style:italic}
+.mm-txt code{background:var(--s1);padding:2px 7px;border-radius:6px;font-family:var(--fm);font-size:13px;color:#0b57d0}
+.mm-txt pre{background:var(--white);border:1px solid var(--border2);border-radius:12px;overflow:hidden;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border2);background:var(--s1)}
+.cl{font-family:var(--fm);font-size:12px;color:var(--td)}
+.ccb{background:none;border:none;cursor:pointer;color:var(--td);font-family:var(--fw);font-size:12px;display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;transition:background .15s}
+.ccb:hover{background:var(--s2);color:var(--tp)}
+.mm-txt pre code{display:block;padding:14px 16px;background:none;font-size:13px;line-height:1.6;overflow-x:auto;color:#1f1f1f;font-family:var(--fm)}
+.mm-txt ul,.mm-txt ol{padding-left:22px;margin:6px 0}
+.mm-txt li{margin:4px 0}
+.mm-txt h1,.mm-txt h2,.mm-txt h3{color:#1f1f1f;margin:14px 0 6px;font-family:var(--fd)}
+.mm-txt h1{font-size:20px;font-weight:500}
+.mm-txt h2{font-size:17px;font-weight:500}
+.mm-txt h3{font-size:15px;font-weight:600}
+.acts{display:flex;align-items:center;gap:2px;margin-top:4px}
+.ab{width:36px;height:36px;border:none;background:none;cursor:pointer;color:var(--td);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.ab:hover{background:var(--hover);color:var(--ts)}
+
+/* TYPING */
+.typing{display:flex;gap:5px;align-items:center;padding:6px 0}
+.dot{width:8px;height:8px;border-radius:50%;animation:dp 1.4s ease-in-out infinite}
+.dot:nth-child(1){background:var(--g1);animation-delay:0s}
+.dot:nth-child(2){background:var(--g2);animation-delay:.2s}
+.dot:nth-child(3){background:var(--g3);animation-delay:.4s}
+@keyframes dp{0%,80%,100%{transform:scale(.7);opacity:.5}40%{transform:scale(1.1);opacity:1}}
+.cur{display:inline-block;width:2px;height:16px;background:#0b57d0;vertical-align:text-bottom;border-radius:1px;animation:bl 1s step-end infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:0}}
+
+/* INPUT */
+.inp-outer{padding:8px 16px 24px;flex-shrink:0;max-width:720px;width:100%;margin:0 auto}
+.inp-box{background:var(--white);border-radius:28px;display:flex;flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,.12);border:1px solid transparent;transition:box-shadow .2s}
+.inp-box.focused{box-shadow:0 4px 16px rgba(0,0,0,.16)}
+.ip{display:none;gap:8px;padding:10px 20px 0;flex-wrap:wrap}
+.ip.has{display:flex}
+.ith{position:relative;width:64px;height:64px}
+.ith img{width:64px;height:64px;object-fit:cover;border-radius:12px;border:1px solid var(--border2)}
+.ith-x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#444;color:#fff;border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.inp-top{display:flex;align-items:flex-end;gap:4px;padding:14px 12px 6px 20px}
+.ci{flex:1;background:none;border:none;outline:none;color:var(--tp);font-family:var(--fw);font-size:16px;line-height:1.5;resize:none;max-height:180px;padding:0;caret-color:#0b57d0}
+.ci::placeholder{color:var(--td)}
+.ci::-webkit-scrollbar{width:0}
+.sb2{width:44px;height:44px;border-radius:50%;border:none;background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--td);transition:background .15s,color .15s,transform .1s;flex-shrink:0;margin-bottom:4px}
+.sb2.on{background:#0b57d0;color:#fff}
+.sb2.on:hover{background:#1a6fe8;transform:scale(1.05)}
+.inp-bot{display:flex;align-items:center;gap:4px;padding:2px 10px 10px}
+.ii{width:40px;height:40px;border:none;background:none;cursor:pointer;color:var(--ts);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.ii:hover{background:var(--hover);color:var(--tp)}
+.irb{margin-left:auto;display:flex;align-items:center;gap:6px}
+.pb{height:36px;padding:0 16px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--tp);font-size:13px;font-family:var(--fw);cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s}
+.pb:hover{background:var(--s1)}
+.rb{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--white);color:var(--tp);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.rb:hover{background:var(--s1)}
+.vb{width:40px;height:40px;border-radius:50%;border:none;background:var(--s1);color:#0b57d0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.vb:hover{background:var(--s2)}
+#fi{display:none}
+.inf{text-align:center;padding-top:10px;font-size:12px;color:var(--td)}
+
+/* TOAST */
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1f1f1f;color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute;overflow:hidden">
+  <defs>
+    <linearGradient id="gG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4285f4"/>
+      <stop offset="40%" stop-color="#9b59b6"/>
+      <stop offset="70%" stop-color="#e91e8c"/>
+      <stop offset="100%" stop-color="#f4b400"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="scrim" id="scrim" onclick="closeSb()"></div>
+
+<div class="sidebar" id="sidebar">
+  <div class="sb-top">
+    <button class="sb-ham" onclick="closeSb()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+    </button>
+    <span class="sb-name">Close AI</span>
+  </div>
+  <button class="new-chat-sb" onclick="newChat()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    নতুন চ্যাট
+  </button>
+  <div class="sb-lbl">সাম্প্রতিক</div>
+  <div class="hist-list" id="histList"><div style="padding:12px 16px;font-size:13px;color:var(--td)">কোনো চ্যাট নেই</div></div>
+  <div class="sb-bot">
+    <div class="sbi" id="authSbi" onclick="handleAuth()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="opacity:.6"><path d="M12 12c2.7 0 4.9-2.2 4.9-4.9S14.7 2.2 12 2.2 7.1 4.4 7.1 7.1 9.3 12 12 12zm0 2.5c-3.3 0-9.9 1.7-9.9 4.9V22h19.8v-2.6c0-3.2-6.6-4.9-9.9-4.9z"/></svg>
+      <span id="authSbiTxt">লগইন করুন</span>
+    </div>
+    <div class="sbi">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="opacity:.6"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+      Close AI সম্পর্কে
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <button class="ham" onclick="toggleSb()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+    </button>
+    <div class="tb-center">Close AI</div>
+    <div class="tb-right">
+      <button class="ib" onclick="toggleSb()" title="হিস্টোরি">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+      </button>
+      <button class="login-btn" id="loginBtn" onclick="handleAuth()">লগইন</button>
+    </div>
+  </div>
+
+  <div class="chat-area">
+    <div class="welcome" id="welcomeScreen">
+      <div class="w-hi">হ্যালো,</div>
+      <div class="w-title">আজ কোথা থেকে শুরু করব?</div>
+      <div class="star-wrap">
+        <svg class="star-svg" width="44" height="44" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C12 7.523 7.523 12 2 12C7.523 12 12 16.477 12 22C12 16.477 16.477 12 22 12C16.477 12 12 7.523 12 2Z" fill="url(#gG)"/>
+        </svg>
+      </div>
+      <div class="chips">
+        <button class="chip" onclick="useChip(this)">
+          <span style="font-size:18px">🖼️</span> ছবি তৈরি করো
+        </button>
+        <button class="chip" onclick="useChip(this)">
+          <span style="font-size:18px">🎵</span> মিউজিক তৈরি করো
+        </button>
+        <button class="chip" onclick="useChip(this)">
+          <span style="font-size:18px">✍️</span> যেকোনো কিছু লেখো
+        </button>
+        <button class="chip" onclick="useChip(this)">
+          <span style="font-size:18px">📚</span> শিখতে সাহায্য করো
+        </button>
+      </div>
+    </div>
+
+    <div class="msgs-wrap" id="msgsWrap">
+      <div class="msgs-inner" id="msgsInner"></div>
+    </div>
+  </div>
+
+  <div class="inp-outer">
+    <div class="inp-box" id="inputBox">
+      <div class="ip" id="imgPrev"></div>
+      <div class="inp-top">
+        <textarea class="ci" id="ci" placeholder="Ask Close AI" rows="1"
+          oninput="onInp(this)"
+          onkeydown="onKey(event)"
+          onfocus="document.getElementById('inputBox').classList.add('focused')"
+          onblur="document.getElementById('inputBox').classList.remove('focused')"
+        ></textarea>
+        <button class="sb2" id="sb2" onclick="doSend()">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+      <div class="inp-bot">
+        <button class="ii" onclick="document.getElementById('fi').click()" title="ফাইল/ছবি যোগ করুন">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+        <button class="ii" onclick="document.getElementById('fi').click()" title="গ্যালারি">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        </button>
+        <input type="file" id="fi" accept="image/*,.pdf,.txt,.doc,.docx" multiple onchange="onFile(event)">
+        <div class="irb">
+          <button class="pb" title="মডেল">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2.05v2.02c3.95.49 7 3.85 7 7.93 0 3.21-1.81 6-4.72 7.72L13 17v5h5l-1.22-1.22C19.91 19.07 22 15.76 22 12c0-5.18-3.95-9.45-9-9.95zM11 2.05C5.95 2.55 2 6.82 2 12c0 3.76 2.09 7.07 5.22 8.78L6 22h5V2.05z"/></svg>
+            Fast
+          </button>
+          <button class="rb" title="মাইক্রোফোন">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+          </button>
+          <button class="vb" title="ভয়েস মোড">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 9v6h4l5 5V4l-5 5H9zm-2 2H5v2h2v-2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="inf">Close AI ভুল তথ্য দিতে পারে। গুরুত্বপূর্ণ বিষয়ে যাচাই করুন।</div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-modal">
+    <button class="auth-close" onclick="closeAuthModal()">✕</button>
+    <div class="auth-title" id="authTitle">লগইন করুন</div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">লগইন</div>
+      <div class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">সাইন আপ</div>
+    </div>
+    <div class="auth-err" id="authErr"></div>
+    <input class="auth-field" id="authEmail" type="email" placeholder="ইমেইল" autocomplete="email">
+    <input class="auth-field" id="authPass" type="password" placeholder="পাসওয়ার্ড" autocomplete="current-password">
+    <button class="auth-btn" id="authSubmitBtn" onclick="submitEmailAuth()">লগইন করুন</button>
+    <div class="auth-divider">অথবা</div>
+    <button class="auth-google" onclick="googleAuth()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
+      Google দিয়ে চালিয়ে যান
+    </button>
+    <div class="auth-guest" onclick="closeAuthModal()">লগইন ছাড়াই চালিয়ে যান (চ্যাট সেভ হবে না)</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════ SUPABASE SETUP ═══════════════════════
+// এই URL ও anon key পাবলিক থাকা নিরাপদ, শর্ত থাকে যে Supabase-এ
+// Row Level Security (RLS) চালু আছে ও policy ঠিকমতো বসানো আছে।
+const supabaseUrl = 'https://weqgzqmeanniynlglhek.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlcWd6cW1lYW5uaXlubGdsaGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNDIzODgsImV4cCI6MjA5ODYxODM4OH0.7YLfbt_oM8RPfBNci3kDjPmPPcQA0iP8px4F_w_-EEs';
+const sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+let currentUser = null;
+let authMode = 'login';
+
+// ═══════════════════════ GEMINI SETUP (নিরাপদ প্রক্সির মাধ্যমে) ═══════════════════════
+// Gemini API key আর এখানে নেই — সেটা এখন শুধু সার্ভারে (Vercel Environment Variable) থাকে।
+// /api/gemini.js ফাইলটাই আসল key ব্যবহার করে Google-এর সাথে কথা বলে, ব্রাউজার সেই key কখনো দেখে না।
+const SURL = `/api/gemini?mode=stream`;
+const GURL = `/api/gemini?mode=generate`;
+
+let convos = {};
+let curId  = null;
+let busy   = false;
+let imgs   = [];
+let pressTimer; 
+let isLongPress = false;
+
+// SIDEBAR
+function toggleSb(){
+  const sidebar = document.getElementById('sidebar');
+  const scrim = document.getElementById('scrim');
+  sidebar.classList.toggle('open');
+  scrim.classList.toggle('on');
+}
+function closeSb(){
+  const sidebar = document.getElementById('sidebar');
+  const scrim = document.getElementById('scrim');
+  sidebar.classList.remove('open');
+  scrim.classList.remove('on');
+}
+
+// ═══════════════════════ AUTH ═══════════════════════
+function updateAuthUI(){
+  const btn=document.getElementById('loginBtn');
+  const sbiTxt=document.getElementById('authSbiTxt');
+  if(currentUser){
+    const initial=(currentUser.email||'U')[0].toUpperCase();
+    btn.textContent=initial;
+    btn.classList.add('logged');
+    btn.title=currentUser.email;
+    sbiTxt.textContent='লগ আউট ('+currentUser.email+')';
+  }else{
+    btn.textContent='লগইন';
+    btn.classList.remove('logged');
+    btn.title='লগইন করুন';
+    sbiTxt.textContent='লগইন করুন';
+  }
+}
+
+async function checkAuth(){
+  const {data:{user}}=await sb.auth.getUser();
+  currentUser=user;
+  updateAuthUI();
+}
+
+async function handleAuth(){
+  closeSb();
+  if(currentUser){
+    if(!confirm('আপনি কি লগ আউট করতে চান?'))return;
+    await sb.auth.signOut();
+    currentUser=null;
+    convos=JSON.parse(localStorage.getItem('cai2_convos_guest')||'{}');
+    updateAuthUI();
+    newChat();
+    toast('লগ আউট হয়েছে');
+  }else{
+    openAuthModal();
+  }
+}
+
+function openAuthModal(){
+  document.getElementById('authOverlay').classList.add('show');
+}
+function closeAuthModal(){
+  document.getElementById('authOverlay').classList.remove('show');
+  const err=document.getElementById('authErr');
+  err.style.display='none';
+}
+function switchAuthTab(mode){
+  authMode=mode;
+  document.getElementById('tabLogin').classList.toggle('active',mode==='login');
+  document.getElementById('tabSignup').classList.toggle('active',mode==='signup');
+  document.getElementById('authTitle').textContent = mode==='login' ? 'লগইন করুন' : 'অ্যাকাউন্ট তৈরি করুন';
+  document.getElementById('authSubmitBtn').textContent = mode==='login' ? 'লগইন করুন' : 'সাইন আপ করুন';
+  document.getElementById('authErr').style.display='none';
+}
+
+async function submitEmailAuth(){
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  const errEl=document.getElementById('authErr');
+  const btn=document.getElementById('authSubmitBtn');
+  errEl.style.display='none';
+  if(!email||!pass){
+    errEl.style.color='#d93025';errEl.textContent='ইমেইল ও পাসওয়ার্ড দিন';errEl.style.display='block';return;
+  }
+  btn.disabled=true;
+  try{
+    if(authMode==='login'){
+      const {error}=await sb.auth.signInWithPassword({email,password:pass});
+      if(error)throw error;
+    }else{
+      const {error}=await sb.auth.signUp({email,password:pass});
+      if(error)throw error;
+      errEl.style.color='#188038';
+      errEl.textContent='সাইন আপ সফল হয়েছে! এখন লগইন করুন।';
+      errEl.style.display='block';
+      switchAuthTab('login');
+    }
+  }catch(e){
+    errEl.style.color='#d93025';
+    errEl.textContent=e.message||'সমস্যা হয়েছে, আবার চেষ্টা করুন';
+    errEl.style.display='block';
+  }
+  btn.disabled=false;
+}
+
+async function googleAuth(){
+  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.href}});
+  if(error)alert('Google লগইন সমস্যা: '+error.message);
+}
+
+sb.auth.onAuthStateChange(async (_event,session)=>{
+  const wasLoggedIn=!!currentUser;
+  currentUser=session?.user||null;
+  updateAuthUI();
+  if(currentUser&&!wasLoggedIn){
+    closeAuthModal();
+    document.getElementById('authEmail').value='';
+    document.getElementById('authPass').value='';
+    await loadUserConvos();
+    toast('লগইন হয়েছে');
+  }
+});
+
+// ═══════════════════════ DUAL SYNC LOGIC ═══════════════════════
+async function save(){
+  if(!curId || !convos[curId]) return;
+  
+  const storageKey = currentUser ? `cai2_convos_${currentUser.id}` : 'cai2_convos_guest';
+  const k=Object.keys(convos);
+  if(k.length>100) k.slice(0,k.length-100).forEach(x=>delete convos[x]);
+  localStorage.setItem(storageKey, JSON.stringify(convos));
+
+  if(currentUser){
+    await saveToCloud(curId);
+  }
+}
+
+async function saveToCloud(id){
+  if(!currentUser||!convos[id])return;
+  try{
+    await sb.from('conversations').upsert({
+      id:id,
+      user_id:currentUser.id,
+      title:convos[id].title||'চ্যাট',
+      messages:JSON.stringify(convos[id].msgs), 
+      updated_at:new Date().toISOString()
+    });
+  }catch(e){console.error('cloud save error',e);}
+}
+
+async function deleteFromCloud(id){
+  if(!currentUser)return;
+  try{await sb.from('conversations').delete().eq('id',id).eq('user_id',currentUser.id);}catch(e){console.error(e);}
+}
+
+async function loadUserConvos(){
+  if(!currentUser) return;
+  const storageKey = `cai2_convos_${currentUser.id}`;
+  
+  const localBackup = localStorage.getItem(storageKey);
+  if(localBackup){
+    try{ convos = JSON.parse(localBackup); renderHist(); }catch(e){}
+  }
+
+  try{
+    const {data,error}=await sb.from('conversations').select('*').eq('user_id',currentUser.id).order('updated_at',{ascending:true});
+    if(error) throw error;
+    if(data && data.length > 0) {
+      convos={};
+      data.forEach(row=>{
+        let parsedMsgs = [];
+        try {
+          parsedMsgs = typeof row.messages === 'string' ? JSON.parse(row.messages) : (row.messages || []);
+        } catch(e) { parsedMsgs = []; }
+        convos[row.id]={title:row.title,msgs:parsedMsgs};
+      });
+      localStorage.setItem(storageKey, JSON.stringify(convos));
+      renderHist();
+    }
+  }catch(e){console.error('load convos cloud sync error',e);}
+}
+
+// ═══════════════════════ INPUT & CHIPS ═══════════════════════
+function onInp(el){
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,180)+'px';
+  const sendBtn = document.getElementById('sb2');
+  if(sendBtn) {
+    sendBtn.classList.toggle('on', el.value.trim().length > 0 || imgs.length > 0);
+  }
+}
+
+function onKey(e){
+  if(e.key==='Enter' && !e.shiftKey){
+    e.preventDefault();
+    if(!busy) doSend();
+  }
+}
+
+function useChip(el){
+  const ci = document.getElementById('ci');
+  ci.value=el.innerText.trim();
+  onInp(ci);
+  doSend();
+}
+
+// FILE ATTACHMENT
+function onFile(e){
+  const sendBtn = document.getElementById('sb2');
+  [...e.target.files].forEach(f=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      imgs.push({b64:ev.target.result.split(',')[1],mime:f.type||'image/jpeg',name:f.name,url:ev.target.result});
+      renderImgs();
+      if(sendBtn) sendBtn.classList.add('on');
+    };r.readAsDataURL(f);
+  });
+  e.target.value='';
+}
+
+function renderImgs(){
+  const imgPrev = document.getElementById('imgPrev');
+  imgPrev.innerHTML=imgs.map((img,i)=>`<div class="ith"><img src="${img.url}"><button class="ith-x" onclick="rmImg(${i})">×</button></div>`).join('');
+  imgPrev.classList.toggle('has',imgs.length>0);
+}
+
+function rmImg(i){
+  const ci = document.getElementById('ci');
+  const sendBtn = document.getElementById('sb2');
+  imgs.splice(i,1);
+  renderImgs();
+  if(!imgs.length && !ci.value.trim() && sendBtn) sendBtn.classList.remove('on');
+}
+
+// SEND LOGIC
+async function doSend(){
+  if(busy)return;
+  const ci = document.getElementById('ci');
+  const sendBtn = document.getElementById('sb2');
+  const txt=ci.value.trim();
+  if(!txt&&!imgs.length)return;
+  showMsgs();
+  if(!curId){curId='c'+Date.now();convos[curId]={title:'...',msgs:[]};}
+
+  const myImgs=[...imgs];imgs=[];renderImgs();
+  convos[curId].msgs.push({role:'user',text:txt,imgs:myImgs.map(i=>({b64:i.b64,mime:i.mime,name:i.name}))});
+  addUMsg(txt,myImgs);
+
+  ci.value='';ci.style.height='auto';
+  if(sendBtn) sendBtn.classList.remove('on');
+  await stream(txt,myImgs);
+  if(convos[curId] && convos[curId].msgs.length===2) await autoTitle(curId,txt||myImgs[0]?.name||'ছবি');
+  await save();renderHist();
+}
+
+function addUMsg(txt,myImgs){
+  const msgsInner = document.getElementById('msgsInner');
+  const b=document.createElement('div');
+  b.className='mb';
+  let ih='';
+  if(myImgs&&myImgs.length)
+    ih=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:${txt?8:0}px">
+      ${myImgs.map(i=>`<img src="${i.url}" style="max-width:180px;max-height:180px;border-radius:12px;border:1px solid var(--border2)">`).join('')}
+    </div>`;
+  b.innerHTML=`<div class="mu"><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:82%">
+    ${ih}${txt?`<div class="mu-bub">${esc(txt)}</div>`:''}
+  </div></div>`;
+  msgsInner.appendChild(b);scrollBot();return b;
+}
+
+// ═══════════════════════ STREAM (এরর-টেক্সট আর কখনো ডাটাবেজে সেভ হবে না) ═══════════════════════
+// যেসব বাক্যাংশ থাকলে বুঝতে হবে এটা AI-এর আসল উত্তর না, বরং সার্ভারের ব্যস্ততা/এরর মেসেজ
+const ERROR_PATTERNS = [
+  /experiencing high demand/i,
+  /spikes in demand/i,
+  /quota/i,
+  /rate limit/i,
+  /resource has been exhausted/i,
+  /internal error/i,
+  /try again later/i,
+  /server error/i,
+  /temporarily unavailable/i,
+  /service unavailable/i,
+  /overloaded/i
+];
+function looksLikeError(s){
+  return ERROR_PATTERNS.some(re => re.test(s));
+}
+
+async function stream(txt,myImgs,retryCount){
+  retryCount = retryCount || 0;
+  busy=true;
+  const msgsInner = document.getElementById('msgsInner');
+  const b=document.createElement('div');b.className='mb';
+  b.innerHTML=`<div class="mm">
+    <svg class="mm-icon" width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 7.523 7.523 12 2 12C7.523 12 12 16.477 12 22C12 16.477 16.477 12 22 12C16.477 12 12 7.523 12 2Z" fill="url(#gG)"/></svg>
+    <div class="mm-body">
+      <div class="mm-txt" id="_st"></div>
+      <div class="acts" style="display:none">
+        <button class="ab" onclick="cpReply(this)" title="কপি"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></button>
+      </div>
+    </div>
+  </div>`;
+  msgsInner.appendChild(b);
+
+  const te=b.querySelector('#_st');te.removeAttribute('id');
+  const ae=b.querySelector('.acts');
+  
+  const ty=document.createElement('div');
+  ty.className='typing';
+  ty.innerHTML='<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  te.appendChild(ty);scrollBot();
+
+  const hist=convos[curId].msgs.slice(0,-1).map(m=>{
+    if(m.role==='model')return{role:'model',parts:[{text:m.text||''}]};
+    const p=[];
+    if(m.imgs&&m.imgs.length)m.imgs.forEach(i=>p.push({inline_data:{mime_type:i.mime,data:i.b64}}));
+    if(m.text)p.push({text:m.text});
+    return{role:'user',parts:p.length?p:[{text:''}]};
+  });
+  const cp=[];
+  if(myImgs&&myImgs.length)myImgs.forEach(i=>cp.push({inline_data:{mime_type:i.mime,data:i.b64}}));
+  if(txt)cp.push({text:txt});
+
+  let full='';
+  let hadError=false;
+  try{
+    let res;
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while(attempts < maxAttempts) {
+      res = await fetch(SURL,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          systemInstruction: { parts: [{ text: "তুমি Close AI, একটি সহায়ক বাংলা AI assistant। সবসময় নির্ভুল, স্পষ্ট ও বিস্তারিত উত্তর দাও। বাংলায় প্রশ্ন করলে বাংলায়, ইংরেজিতে প্রশ্ন করলে ইংরেজিতে উত্তর দাও।" }] },
+          contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}],
+          generationConfig:{temperature:1,topK:40,topP:.95,maxOutputTokens:8192}
+        })
+      });
+
+      if (res.status === 429 || res.status === 503) {
+        attempts++;
+        if(ty && ty.parentNode) ty.remove();
+        for (let timeLeft = 15; timeLeft > 0; timeLeft--) {
+          te.innerHTML = `<div style="color:#0b57d0; font-weight:500; background: var(--s1); padding: 10px; border-radius: 12px; display: inline-block;">⏳ সার্ভারে চাপ বেশি। লাইনে দাঁড়িয়ে আছি... <strong>${timeLeft}</strong> সেকেন্ড পর আবার চেষ্টা করা হবে (চেষ্টা: ${attempts}/${maxAttempts})</div>`;
+          scrollBot();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        te.innerHTML = ''; te.appendChild(ty); scrollBot();
+        continue; 
+      }
+      break; 
+    }
+
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'API Error '+res.status);}
+    
+    if(ty && ty.parentNode) ty.remove();
+    te.innerHTML='';
+    const rd=res.body.getReader();const dc=new TextDecoder();let buf='';
+    while(true){
+      const{done,value}=await rd.read();if(done)break;
+      buf+=dc.decode(value,{stream:true});
+      const ls=buf.split('\n');buf=ls.pop();
+      for(const l of ls){
+        if(!l.startsWith('data: '))continue;
+        const raw=l.slice(6).trim();if(raw==='[DONE]')continue;
+        try{
+          const j=JSON.parse(raw);
+          const p=j.candidates?.[0]?.content?.parts?.[0]?.text||'';
+
+          if(p && looksLikeError(p)){
+            hadError = true;
+            break;
+          }
+
+          if(p){full+=p;te.innerHTML=md(full)+'<span class="cur"></span>';scrollBot();}
+        }catch{}
+      }
+      if(hadError) break;
+    }
+
+    // ═══ চূড়ান্ত নিরাপত্তা চেক: পুরো উত্তর জোড়া দিয়েও এরর-সদৃশ কিনা দেখা হয় ═══
+    // এই চেক পাস না করলে convos-এ কখনোই পুশ হবে না, তাই ডাটাবেজেও সেভ হবে না।
+    if(!hadError && looksLikeError(full)) hadError = true;
+
+    if(hadError || !full){
+      if(retryCount < 3){
+        te.innerHTML = `<div style="color:#0b57d0; font-weight:500; background: var(--s1); padding: 10px; border-radius: 12px; display: inline-block;">⏳ সার্ভারে চাপ বেশি। ১৫ সেকেন্ড পর পুনরায় চেষ্টা করা হচ্ছে... (${retryCount+1}/3)</div>`;
+        scrollBot();
+        setTimeout(() => { stream(txt, myImgs, retryCount+1); }, 15000);
+        busy = false; return;
+      } else {
+        te.innerHTML = `<span style="color:#d93025">⚠️ সার্ভার এখন ব্যস্ত। কিছুক্ষণ পর আবার চেষ্টা করুন।</span>`;
+        busy=false; scrollBot(); return;
+      }
+    }
+
+    te.innerHTML=md(full);
+    convos[curId].msgs.push({role:'model',text:full}); 
+    ae.style.display='flex';
+  }catch(err){
+    if(ty && ty.parentNode) ty.remove();
+    te.innerHTML=`<span style="color:#d93025">⚠️ ত্রুটি: ${esc(err.message)}</span>`;
+  }
+  busy=false;scrollBot();
+}
+
+async function autoTitle(id,txt){
+  try{
+    const r=await fetch(GURL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{role:'user',parts:[{text:`এই প্রশ্নের একটি সংক্ষিপ্ত শিরোনাম দাও (৪-৫ শব্দে, শুধু শিরোনাম): "${txt}"`}]}],generationConfig:{maxOutputTokens:20,temperature:.2}})});
+    const d=await r.json();
+    const t=d.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||txt.slice(0,40);
+    if(convos[id]) {
+      convos[id].title=t.replace(/["*#]/g,'').trim().slice(0,55);
+      await save();renderHist();
+    }
+  }catch{}
+}
+
+// UI HANDLERS
+function showMsgs(){
+  document.getElementById('welcomeScreen').style.display='none';
+  document.getElementById('msgsWrap').style.display='block';
+}
+function cpReply(btn){navigator.clipboard.writeText(btn.closest('.mm-body').querySelector('.mm-txt').innerText).then(()=>toast('✅ কপি হয়েছে'));}
+function scrollBot(){
+  const msgsWrap = document.getElementById('msgsWrap');
+  requestAnimationFrame(()=>msgsWrap.scrollTop=msgsWrap.scrollHeight);
+}
+
+// ═══════════════════════ SIDEBAR HIST & LONG PRESS ═══════════════════════
+function renderHist(){
+  const histList = document.getElementById('histList');
+  const keys=Object.keys(convos).reverse();
+  if(!keys.length){histList.innerHTML='<div style="padding:12px 16px;font-size:13px;color:var(--td)">কোনো চ্যাট নেই</div>';return;}
+  
+  histList.innerHTML='';
+  keys.forEach(id => {
+    const chatItem = document.createElement('div');
+    chatItem.className = `hi ${id===curId?'active':''}`;
+    chatItem.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;color:var(--td);pointer-events:none;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+      <span class="hi-txt" style="pointer-events:none;">${esc(convos[id].title||'চ্যাট')}</span>
+      <button class="hi-del"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+    `;
+
+    const startPress = () => {
+      isLongPress = false;
+      pressTimer = setTimeout(() => {
+        isLongPress = true;
+        chatItem.classList.add('holding');
+        showActionMenu(id, convos[id].title || 'চ্যাট');
+      }, 600); 
+    };
+    const endPress = () => {
+      clearTimeout(pressTimer);
+      setTimeout(() => { chatItem.classList.remove('holding'); }, 50);
+    };
+
+    chatItem.addEventListener('touchstart', startPress, {passive: true});
+    chatItem.addEventListener('touchend', endPress, {passive: true});
+    chatItem.addEventListener('mousedown', startPress);
+    chatItem.addEventListener('mouseup', endPress);
+    chatItem.addEventListener('mouseleave', endPress);
+
+    chatItem.addEventListener('click', (e) => {
+      if (isLongPress) { e.preventDefault(); return; }
+      if (e.target.closest('.hi-del')) return;
+      loadC(id);
+    });
+
+    chatItem.querySelector('.hi-del').addEventListener('click', (e) => {
+      e.stopPropagation();e.preventDefault();
+      if (confirm("আপনি কি নিশ্চিতভাবে এই চ্যাটটি ডাটাবেজ ও লোকাল অ্যাপ থেকে ডিলিট করতে চান?")) {
+        delC(id);
+      }
+    });
+
+    histList.appendChild(chatItem);
+  });
+}
+
+function showActionMenu(chatId, currentTitle) {
+  const action = prompt(`চ্যাটের নাম পরিবর্তন (Rename) করতে নতুন নাম লিখুন।\n\nচ্যাটটি ডিলিট করতে চাইলে বড় হাতের অক্ষরে 'DELETE' লিখুন:`, currentTitle);
+  if (action === null) return;
+
+  if (action.trim().toUpperCase() === 'DELETE') {
+    if (confirm("আপনি কি নিশ্চিতভাবে এই চ্যাটটি ডাটাবেজ থেকে চিরতরে ডিলিট করতে চান?")) {
+      delC(chatId);
+    }
+  } else if (action.trim() !== "" && action !== currentTitle) {
+    renameC(chatId, action.trim());
+  }
+}
+
+async function renameC(id, newTitle) {
+  if(convos[id]) convos[id].title = newTitle;
+  const storageKey = currentUser ? `cai2_convos_${currentUser.id}` : 'cai2_convos_guest';
+  localStorage.setItem(storageKey, JSON.stringify(convos));
+
+  if(currentUser) {
+    try { await sb.from('conversations').update({ title: newTitle, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id); } catch(e) { console.error(e); }
+  }
+  toast('✅ রিনেম সফল হয়েছে');
+  renderHist();
+}
+
+function loadC(id){
+  if(!convos[id]) return;
+  curId=id; showMsgs(); 
+  const msgsInner = document.getElementById('msgsInner');
+  msgsInner.innerHTML='';
+  convos[id].msgs.forEach(m=>{
+    if(m.role==='user'){
+      const fi2=m.imgs?m.imgs.map(i=>({...i,url:'data:'+i.mime+';base64,'+i.b64})):[];
+      addUMsg(m.text,fi2);
+    }else{
+      const b=document.createElement('div');b.className='mb';
+      b.innerHTML=`<div class="mm">
+        <svg class="mm-icon" width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 7.523 7.523 12 2 12C7.523 12 12 16.477 12 22C12 16.477 16.477 12 22 12C16.477 12 12 7.523 12 2Z" fill="url(#gG)"/></svg>
+        <div class="mm-body">
+          <div class="mm-txt">${md(m.text)}</div>
+          <div class="acts" style="display:flex">
+            <button class="ab" onclick="cpReply(this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></button>
+          </div>
+        </div>
+      </div>`;
+      msgsInner.appendChild(b);
+    }
+  });
+  renderHist();closeSb();scrollBot();
+}
+
+async function delC(id){
+  delete convos[id];
+  if(curId===id) newChat();
+  
+  const storageKey = currentUser ? `cai2_convos_${currentUser.id}` : 'cai2_convos_guest';
+  localStorage.setItem(storageKey, JSON.stringify(convos));
+
+  if(currentUser) await deleteFromCloud(id);
+  toast('🗑️ চ্যাট ডিলিট করা হয়েছে');
+  renderHist();
+}
+
+function newChat(){
+  const welcomeScreen = document.getElementById('welcomeScreen');
+  const msgsWrap = document.getElementById('msgsWrap');
+  const msgsInner = document.getElementById('msgsInner');
+  const ci = document.getElementById('ci');
+  curId=null;imgs=[];renderImgs();
+  welcomeScreen.style.display='';msgsWrap.style.display='none';msgsInner.innerHTML='';
+  closeSb();renderHist();ci.focus();
+}
+
+// MARKDOWN PARSER
+function md(t){
+  if(!t) return '';
+  t=t.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>{
+    return `<pre><div class="ch"><span class="cl">${lang||'code'}</span><button class="ccb" onclick="cpCode(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> কপি</button></div><code>${esc(code.trim())}</code></pre>`;
+  });
+  t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+  t=t.replace(/\*\*\*([^*]+)\*\*\*/g,'<strong><em>$1</em></strong>');
+  t=t.replace(/\**([^*]+)\*\*/g,'<strong>$1</strong>');
+  t=t.replace(/\*([^*\n]+)\*/g,'<em>$1</em>');
+  t=t.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  t=t.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+  t=t.replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  t=t.replace(/^[-•] (.+)$/gm,'<li>$1</li>');
+  t=t.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+  t=t.replace(/(?:^|\n)(<li>[\s\S]*?<\/li>)(?=\n[^<li>]|$)/g,'<ul>$1</ul>');
+  t=t.replace(/\n\n+/g,'</p><p>');
+  t=t.replace(/\n/g,'<br>');
+  if(!t.startsWith('<'))t='<p>'+t+'</p>';
+  return t;
+}
+function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function cpCode(btn){navigator.clipboard.writeText(btn.closest('pre').querySelector('code').innerText).then(()=>toast('✅ কোড কপি হয়েছে'));}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+
+// ═══════════════════════ APP INIT ═══════════════════════
+(async function init(){
+  await checkAuth();
+  if(currentUser){
+    await loadUserConvos();
+  }else{
+    try{ convos=JSON.parse(localStorage.getItem('cai2_convos_guest')||'{}'); }catch(e){convos={};}
+    renderHist();
+  }
+})();
+</script>
+</body>
+</html>
