@@ -19,7 +19,7 @@ export default async function handler(req) {
     );
   }
 
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-3-flash-preview';
   const endpoint = mode === 'stream' ? 'streamGenerateContent' : 'generateContent';
   const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}${mode === 'stream' ? '&alt=sse' : ''}`;
 
