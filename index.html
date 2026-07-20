@@ -215,7 +215,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tp);font-
     <span class="sb-name">Close AI</span>
   </div>
   <button class="new-chat-sb" onclick="newChat()">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71(7.04)c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
     নতুন চ্যাট
   </button>
   <div class="sb-lbl">সাম্প্রতিক</div>
@@ -616,7 +616,6 @@ function onKey(e){
 function useChip(el){
   const ci = document.getElementById('ci');
   if(ci) {
-    // ইমোজি বাদ দিয়ে শুধু ক্লিন টেক্সটটুকু ফিল্টার করে ইনপুট বক্সে নেওয়া হচ্ছে
     const cleanText = el.innerText.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDC00-\uDFFF]/g, "").trim();
     ci.value = cleanText;
     onInp(ci);
@@ -798,9 +797,9 @@ async function stream(txt, myImgs){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        systemInstruction: { parts: [{ text: dynamicSystemInstruction }] },
+        // ✅ Gemini REST API স্ট্যান্ডার্ড অনুযায়ী systemInstruction-এর অবজেক্ট ফরম্যাট নিখুঁত করা হয়েছে
+        systemInstruction: { content: { parts: [{ text: dynamicSystemInstruction }] } },
         contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}]
-        // 🤖 সার্চ লজিক এখন সম্পূর্ণ ব্যাকএন্ড এপিআই হ্যান্ডেল করছে
       })
     });
 
@@ -1165,4 +1164,4 @@ function toast(msg){
 })();
 </script>
 </body>
-    </html>
+          </html>
