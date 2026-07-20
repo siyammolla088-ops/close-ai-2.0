@@ -1,14 +1,11 @@
-// api/gemini.js
 export const config = { runtime: 'edge' };
 
-const DAILY_SEARCH_LIMIT = 1400; // ১৫০০ ফ্রি লিমিটের মধ্যে বাফারসহ ১৪০০ সেট করা
+// আপনার চাহিদা অনুযায়ী ডেইলি সার্চ লিমিট ২৫০ করা হলো
+const DAILY_SEARCH_LIMIT = 250; 
 
-// Supabase-এ সার্চ কাউন্ট চেক এবং আপডেট করার ফাংশন
 async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
   const today = new Date().toISOString().slice(0, 10);
-  
   try {
-    // ১. Supabase থেকে আজকের দিনের সার্চ কাউন্ট চেক করা
     const checkUrl = `${supabaseUrl}/rest/v1/search_usage?usage_date=eq.${today}`;
     const res = await fetch(checkUrl, {
       headers: { 
@@ -18,20 +15,16 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
     });
     
     const rows = await res.json();
-    
-    // ডেটাবেজ থেকে পাওয়া কাউন্টকে সেফলি নাম্বারে কনভার্ট করা
     let currentCount = 0;
     if (Array.isArray(rows) && rows.length > 0) {
       currentCount = parseInt(rows[0].count, 10) || 0;
     }
     
-    // লিমিট ১৪০০ পার হয়ে গেলে false রিটার্ন করবে (সার্চ বন্ধের সংকেত)
     if (currentCount >= DAILY_SEARCH_LIMIT) {
-      console.log(`[Search Limit] Daily limit reached (${currentCount}). Turning off Google Search.`);
+      console.log(`[Search Limit] Daily limit reached (${currentCount}).`);
       return false; 
     }
 
-    // ২. লিমিট পার না হলে কাউন্টার ১ বাড়িয়ে ডেটাবেজে Upsert করা
     const upsertUrl = `${supabaseUrl}/rest/v1/search_usage`;
     await fetch(upsertUrl, {
       method: 'POST',
@@ -41,20 +34,21 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
         'Content-Type': 'application/json',
         'Prefer': 'resolution=merge-duplicates, return=minimal'
       },
-      body: JSON.stringify({ 
-        usage_date: today, 
-        count: currentCount + 1 
-      })
+      body: JSON.stringify({ usage_date: today, count: currentCount + 1 })
     });
 
-    return true; // সার্চ করার অনুমতি দেওয়া হলো
+    return true; 
   } catch (e) {
     console.error('Supabase Tracking Error:', e);
-    return true; // কোনো কারণে ডেটাবেজে এরর হলেও অ্যাপ যেন ক্র্যাশ না করে সার্চ করতে দেয়
+    return true; 
   }
 }
 
 export default async function handler(req) {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
+  }
+
   const url = new URL(req.url);
   const mode = url.searchParams.get('mode') || 'generate'; 
 
@@ -63,56 +57,54 @@ export default async function handler(req) {
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: { message: 'সার্ভারে GEMINI_API_KEY সেট করা নেই।' } }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: { message: 'GEMINI_API_KEY missing' } }), { status: 500 });
   }
 
-  const rawBody = await req.text();
   let jsonBody;
   try {
-    jsonBody = JSON.parse(rawBody);
+    jsonBody = await req.json();
   } catch (e) {
-    jsonBody = null;
+    return new Response(JSON.stringify({ error: { message: 'Invalid JSON' } }), { status: 400 });
   }
 
-  // যদি রিকোয়েস্টে লাইভ সার্চ (google_search) অন থাকে, তবেই কাউন্টার চেক হবে
-  if (jsonBody && supabaseUrl && supabaseServiceKey) {
-    const hasSearchTool = jsonBody.tools && jsonBody.tools.some(t => t.google_search || t.googleSearch);
-    
-    if (hasSearchTool) {
-      const canSearch = await checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey);
-      
-      // লিমিট শেষ হয়ে গেলে রিকোয়েস্ট থেকে 'tools' অপশনটি মুছে সাধারণ টেক্সট রিকোয়েস্ট পাঠানো হবে
-      if (!canSearch) {
-        delete jsonBody.tools; 
-      }
+  // 🤖 স্মার্ট অটো-সার্চ লজিক: 
+  // ফ্রন্টএন্ড থেকে tools পাঠানোর দরকার নেই, ব্যাকএন্ড নিজেই Gemini-কে সার্চ করতে বলবে
+  if (supabaseUrl && supabaseServiceKey) {
+    const canSearch = await checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey);
+    if (canSearch) {
+      // এআই নিজেই প্রম্পট বুঝে ডিসাইড করবে কখন সার্চ লাগবে (কোনো কি-ওয়ার্ড লাগবে না)
+      jsonBody.tools = [{ googleSearch: {} }]; 
+    } else {
+      delete jsonBody.tools;
     }
   }
 
-  // মডেল নাম এবং এন্ডপয়েন্ট সেটআপ
+  // Gemini 1.5 বা 2.5 বা আপনার কাঙ্ক্ষিত মডেল এখানে দিন (যেমন: gemini-2.5-flash)
   const model = 'gemini-2.5-flash';
   const endpoint = mode === 'stream' ? 'streamGenerateContent' : 'generateContent';
   const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}${mode === 'stream' ? '&alt=sse' : ''}`;
 
-  const finalBody = jsonBody ? JSON.stringify(jsonBody) : rawBody;
-
   try {
-    const res = await fetch(targetUrl, {
+    const geminiRes = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: finalBody
+      body: JSON.stringify(jsonBody)
     });
 
-    return new Response(res.body, {
-      status: res.status,
-      headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' }
+    // Edge Runtime-এ সেফলি স্ট্রিম পাস করার স্ট্যান্ডার্ড পদ্ধতি
+    const { printable, writable } = new TransformStream();
+    geminiRes.body.pipeTo(writable);
+
+    return new Response(printable, {
+      status: geminiRes.status,
+      headers: {
+        'Content-Type': mode === 'stream' ? 'text/event-stream' : 'application/json',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      }
     });
+
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: { message: 'Gemini API তে রিকোয়েস্ট পাঠাতে সমস্যা হয়েছে।' } }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: { message: error.message } }), { status: 500 });
   }
 }
