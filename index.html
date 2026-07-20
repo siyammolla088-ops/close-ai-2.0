@@ -616,7 +616,9 @@ function onKey(e){
 function useChip(el){
   const ci = document.getElementById('ci');
   if(ci) {
-    ci.value=el.innerText.trim();
+    // ইমোজি বাদ দিয়ে শুধু ক্লিন টেক্সটটুকু ফিল্টার করে ইনপুট বক্সে নেওয়া হচ্ছে
+    const cleanText = el.innerText.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDC00-\uDFFF]/g, "").trim();
+    ci.value = cleanText;
     onInp(ci);
     doSend();
   }
@@ -783,7 +785,6 @@ async function stream(txt, myImgs){
   let full='';
   
   try{
-    // বাংলা তারিখ ফরম্যাট এবং এআই-এর সময় সচেতনতা নিশ্চিত করার প্রম্পট কনফিগারেশন
     const today = new Date().toLocaleDateString('bn-BD', {
       weekday: 'long',
       year: 'numeric',
@@ -793,24 +794,13 @@ async function stream(txt, myImgs){
     
     const dynamicSystemInstruction = `${SYSTEM_PROMPT}\n\nতুমি Close AI, একটি অত্যন্ত উন্নত ও সহায়ক বাংলা AI assistant। সবসময় নির্ভুল, স্পষ্ট ও বিস্তারিত উত্তর দাও। বাংলায় প্রশ্ন করলে বাংলায়, ইংরেজিতে প্রশ্ন করলে ইংরেজিতে উত্তর দাও।\n\n[System Context - Real-time Target DateTime]:\n- Today's Date: ${today}\n- ISO Date: ${new Date().toISOString().slice(0, 10)}`;
 
-    // কন্ডিশনাল গুগল সার্চ লজিক: রিয়েল-টাইম প্রশ্ন থাকলেই কেবল গুগল সার্চ ব্যবহার করা হবে
-    const queryLower = txt ? txt.toLowerCase() : '';
-    const needsSearch = queryLower && (
-      queryLower.includes('আজ') || queryLower.includes('তারিখ') || queryLower.includes('খবর') || 
-      queryLower.includes('দাম') || queryLower.includes('সময়') || queryLower.includes('লাইভ') || 
-      queryLower.includes('আবহাওয়া') || queryLower.includes('today') || queryLower.includes('date') || 
-      queryLower.includes('current') || queryLower.includes('news') || queryLower.includes('latest') || 
-      queryLower.includes('weather') || queryLower.includes('live') || queryLower.includes('time') ||
-      queryLower.includes('score') || queryLower.includes('match')
-    );
-
     const res = await fetch(SURL,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         systemInstruction: { parts: [{ text: dynamicSystemInstruction }] },
-        contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}],
-        tools: needsSearch ? [{ google_search: {} }] : undefined
+        contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}]
+        // 🤖 সার্চ লজিক এখন সম্পূর্ণ ব্যাকএন্ড এপিআই হ্যান্ডেল করছে
       })
     });
 
@@ -1175,4 +1165,4 @@ function toast(msg){
 })();
 </script>
 </body>
-</html>
+    </html>
