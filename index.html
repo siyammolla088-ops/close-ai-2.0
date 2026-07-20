@@ -7,8 +7,7 @@
 <link class="flex-shrink-0" rel="icon" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;600;700&family=Google+Sans+Text:wght@300;400;500;700&family=Google+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
-<!-- সঠিক UMD ব্রাউজার লাইব্রেরি লিঙ্ক নিচে দেওয়া হলো -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -240,7 +239,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tp);font-
     </button>
     <div class="tb-center">Close AI</div>
     <div class="tb-right">
-      <!-- ৩-ডট বাটনটি সাইডবার মেনু টগল করার জন্য সেট করা -->
       <button class="ib" onclick="toggleSb()" title="হিস্টোরি">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
       </button>
@@ -345,21 +343,33 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tp);font-
 // ═══════════════════════ SUPABASE SETUP ═══════════════════════
 const supabaseUrl = 'https://weqgzqmeanniynlglhek.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlcWd6cW1lYW5uaXlubGdsaGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNDIzODgsImV4cCI6MjA5ODYxODM4OH0.7YLfbt_oM8RPfBNci3kDjPmPPcQA0iP8px4F_w_-EEs';
-let sb = null;
 
-// ক্র্যাশ প্রোটেকশনসহ Supabase ক্লায়েন্ট ইনিশিয়ালাইজেশন
+let sb = null;
 try {
-  if (window.supabase && typeof window.supabase.createClient === 'function') {
-    sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+  if (window.supabase) {
+    sb = window.supabase.createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: true }
+    });
+  } else {
+    console.warn("Supabase library not loaded. Running in local/offline guest mode.");
   }
-} catch (e) {
-  console.error("Supabase client init failed:", e);
+} catch(e) {
+  console.error("Supabase initialization failed", e);
 }
 
 let currentUser = null;
 let authMode = 'login';
 
+// ═══════════════════════ SYSTEM PROMPT SETUP ═══════════════════════
+const SYSTEM_PROMPT = `You are Close AI, a highly advanced, ultra-responsive AI assistant. 
+Always adhere to the following strict guidelines:
+- Tone: Helpful, friendly, smart, and concise. Avoid unnecessary preamble.
+- Formatting: Use rich Markdown architecture (bold, code blocks, structured lists, headers) to make responses clean and perfectly scannable.
+- Support: Provide accurate programming scripts, front-end designs, database architectures, and step-by-step technical guides whenever requested.
+- Under no circumstances should you drop or ignore any user instructions. Balance all constraints efficiently.`;
+
 // ═══════════════════════ GEMINI ROUTER ENDPOINTS ═══════════════════════
+// Vercel serverless functions /api/gemini standard relative URLs
 const SURL = `/api/gemini?mode=stream`;
 const GURL = `/api/gemini?mode=generate`;
 
@@ -374,20 +384,25 @@ let isLongPress = false;
 function toggleSb(){
   const sidebar = document.getElementById('sidebar');
   const scrim = document.getElementById('scrim');
-  sidebar.classList.toggle('open');
-  scrim.classList.toggle('on');
+  if(sidebar && scrim) {
+    sidebar.classList.toggle('open');
+    scrim.classList.toggle('on');
+  }
 }
 function closeSb(){
   const sidebar = document.getElementById('sidebar');
   const scrim = document.getElementById('scrim');
-  sidebar.classList.remove('open');
-  scrim.classList.remove('on');
+  if(sidebar && scrim) {
+    sidebar.classList.remove('open');
+    scrim.classList.remove('on');
+  }
 }
 
 // ═══════════════════════ AUTH ═══════════════════════
 function updateAuthUI(){
   const btn=document.getElementById('loginBtn');
   const sbiTxt=document.getElementById('authSbiTxt');
+  if(!btn || !sbiTxt) return;
   if(currentUser){
     const initial=(currentUser.email||'U')[0].toUpperCase();
     btn.textContent=initial;
@@ -409,19 +424,15 @@ async function checkAuth(){
     currentUser=user;
     updateAuthUI();
   } catch(e) {
-    console.error("Auth check failed:", e);
+    console.error("Auth check failed", e);
   }
 }
 
 async function handleAuth(){
   closeSb();
-  if(!sb) {
-    toast("⚠️ ডেটাবেজ সংযোগ বিচ্ছিন্ন! গেস্ট মোড সক্রিয়।");
-    return;
-  }
   if(currentUser){
     if(!confirm('আপনি কি লগ আউট করতে চান?'))return;
-    await sb.auth.signOut();
+    if(sb) await sb.auth.signOut();
     currentUser=null;
     convos=JSON.parse(localStorage.getItem('cai2_convos_guest')||'{}');
     updateAuthUI();
@@ -433,31 +444,47 @@ async function handleAuth(){
 }
 
 function openAuthModal(){
-  document.getElementById('authOverlay').classList.add('show');
+  const modal = document.getElementById('authOverlay');
+  if(modal) modal.classList.add('show');
 }
 function closeAuthModal(){
-  document.getElementById('authOverlay').classList.remove('show');
+  const modal = document.getElementById('authOverlay');
+  if(modal) modal.classList.remove('show');
   const err=document.getElementById('authErr');
-  err.style.display='none';
+  if(err) err.style.display='none';
 }
 function switchAuthTab(mode){
   authMode=mode;
-  document.getElementById('tabLogin').classList.toggle('active',mode==='login');
-  document.getElementById('tabSignup').classList.toggle('active',mode==='signup');
-  document.getElementById('authTitle').textContent = mode==='login' ? 'লগইন করুন' : 'অ্যাকাউন্ট তৈরি করুন';
-  document.getElementById('authSubmitBtn').textContent = mode==='login' ? 'লগইন করুন' : 'সাইন আপ করুন';
-  document.getElementById('authErr').style.display='none';
+  const tabLogin = document.getElementById('tabLogin');
+  const tabSignup = document.getElementById('tabSignup');
+  const authTitle = document.getElementById('authTitle');
+  const authSubmitBtn = document.getElementById('authSubmitBtn');
+  const authErr = document.getElementById('authErr');
+
+  if(tabLogin) tabLogin.classList.toggle('active',mode==='login');
+  if(tabSignup) tabSignup.classList.toggle('active',mode==='signup');
+  if(authTitle) authTitle.textContent = mode==='login' ? 'লগইন করুন' : 'অ্যাকাউন্ট তৈরি করুন';
+  if(authSubmitBtn) authSubmitBtn.textContent = mode==='login' ? 'লগইন করুন' : 'সাইন আপ করুন';
+  if(authErr) authErr.style.display='none';
 }
 
 async function submitEmailAuth(){
-  if(!sb) return;
+  if(!sb) {
+    alert("Supabase কানেকশন পাওয়া যায়নি। গেস্ট মোডে ব্যবহার করুন।");
+    return;
+  }
   const email=document.getElementById('authEmail').value.trim();
   const pass=document.getElementById('authPass').value;
   const errEl=document.getElementById('authErr');
   const btn=document.getElementById('authSubmitBtn');
-  errEl.style.display='none';
+  if(errEl) errEl.style.display='none';
   if(!email||!pass){
-    errEl.style.color='#d93025';errEl.textContent='ইমেইল ও পাসওয়ার্ড দিন';errEl.style.display='block';return;
+    if(errEl) {
+      errEl.style.color='#d93025';
+      errEl.textContent='ইমেইল ও পাসওয়ার্ড দিন';
+      errEl.style.display='block';
+    }
+    return;
   }
   btn.disabled=true;
   try{
@@ -467,21 +494,28 @@ async function submitEmailAuth(){
     }else{
       const {error}=await sb.auth.signUp({email,password:pass});
       if(error)throw error;
-      errEl.style.color='#188038';
-      errEl.textContent='সাইন আপ সফল হয়েছে! এখন লগইন করুন।';
-      errEl.style.display='block';
+      if(errEl) {
+        errEl.style.color='#188038';
+        errEl.textContent='সাইন আপ সফল হয়েছে! এখন লগইন করুন।';
+        errEl.style.display='block';
+      }
       switchAuthTab('login');
     }
   }catch(e){
-    errEl.style.color='#d93025';
-    errEl.textContent=e.message||'সমস্যা হয়েছে, আবার চেষ্টা করুন';
-    errEl.style.display='block';
+    if(errEl) {
+      errEl.style.color='#d93025';
+      errEl.textContent=e.message||'সমস্যা হয়েছে, আবার চেষ্টা করুন';
+      errEl.style.display='block';
+    }
   }
   btn.disabled=false;
 }
 
 async function googleAuth(){
-  if(!sb) return;
+  if(!sb) {
+    alert("Supabase কানেকশন পাওয়া যায়নি। গেস্ট মোডে ব্যবহার করুন।");
+    return;
+  }
   const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.href}});
   if(error)alert('Google লগইন সমস্যা: '+error.message);
 }
@@ -493,8 +527,10 @@ if(sb) {
     updateAuthUI();
     if(currentUser&&!wasLoggedIn){
       closeAuthModal();
-      document.getElementById('authEmail').value='';
-      document.getElementById('authPass').value='';
+      const em = document.getElementById('authEmail');
+      const ps = document.getElementById('authPass');
+      if(em) em.value='';
+      if(ps) ps.value='';
       await loadUserConvos();
       toast('লগইন হয়েছে');
     }
@@ -510,7 +546,7 @@ async function save(){
   if(k.length>100) k.slice(0,k.length-100).forEach(x=>delete convos[x]);
   localStorage.setItem(storageKey, JSON.stringify(convos));
 
-  if(currentUser && sb){
+  if(currentUser){
     await saveToCloud(curId);
   }
 }
@@ -534,7 +570,7 @@ async function deleteFromCloud(id){
 }
 
 async function loadUserConvos(){
-  if(!currentUser||!sb) return;
+  if(!currentUser) return;
   const storageKey = `cai2_convos_${currentUser.id}`;
   
   const localBackup = localStorage.getItem(storageKey);
@@ -542,6 +578,7 @@ async function loadUserConvos(){
     try{ convos = JSON.parse(localBackup); renderHist(); }catch(e){}
   }
 
+  if(!sb) return;
   try{
     const {data,error}=await sb.from('conversations').select('*').eq('user_id',currentUser.id).order('updated_at',{ascending:true});
     if(error) throw error;
@@ -579,9 +616,11 @@ function onKey(e){
 
 function useChip(el){
   const ci = document.getElementById('ci');
-  ci.value=el.innerText.trim();
-  onInp(ci);
-  doSend();
+  if(ci) {
+    ci.value=el.innerText.trim();
+    onInp(ci);
+    doSend();
+  }
 }
 
 // FILE ATTACHMENT
@@ -600,8 +639,10 @@ function onFile(e){
 
 function renderImgs(){
   const imgPrev = document.getElementById('imgPrev');
-  imgPrev.innerHTML=imgs.map((img,i)=>`<div class="ith"><img src="${img.url}"><button class="ith-x" onclick="rmImg(${i})">×</button></div>`).join('');
-  imgPrev.classList.toggle('has',imgs.length>0);
+  if(imgPrev) {
+    imgPrev.innerHTML=imgs.map((img,i)=>`<div class="ith"><img src="${img.url}"><button class="ith-x" onclick="rmImg(${i})">×</button></div>`).join('');
+    imgPrev.classList.toggle('has',imgs.length>0);
+  }
 }
 
 function rmImg(i){
@@ -609,7 +650,7 @@ function rmImg(i){
   const sendBtn = document.getElementById('sb2');
   imgs.splice(i,1);
   renderImgs();
-  if(!imgs.length && !ci.value.trim() && sendBtn) sendBtn.classList.remove('on');
+  if(!imgs.length && (!ci || !ci.value.trim()) && sendBtn) sendBtn.classList.remove('on');
 }
 
 // SEND LOGIC
@@ -617,6 +658,7 @@ async function doSend(){
   if(busy)return;
   const ci = document.getElementById('ci');
   const sendBtn = document.getElementById('sb2');
+  if(!ci) return;
   const txt=ci.value.trim();
   if(!txt&&!imgs.length)return;
   showMsgs();
@@ -644,6 +686,7 @@ async function doSend(){
 
 function addUMsg(txt,myImgs){
   const msgsInner = document.getElementById('msgsInner');
+  if(!msgsInner) return null;
   const b=document.createElement('div');
   b.className='mb';
   let ih='';
@@ -675,10 +718,10 @@ function looksLikeError(s){
   return ERROR_PATTERNS.some(re => re.test(s));
 }
 
-async function manualRetry(btn, oldTxt, oldImgsJson){
+async function manualRetry(btn){
   if(busy) return;
-  let oldImgs = [];
-  try { oldImgs = JSON.parse(oldImgsJson); } catch(e){}
+  const oldTxt = btn._retryTxt || '';
+  const oldImgs = btn._retryImgs || [];
   
   const card = btn.closest('.mb');
   if(card) card.remove();
@@ -705,6 +748,7 @@ async function manualRetry(btn, oldTxt, oldImgsJson){
 async function stream(txt, myImgs){
   busy=true;
   const msgsInner = document.getElementById('msgsInner');
+  if(!msgsInner) return;
   const b=document.createElement('div');b.className='mb';
   b.innerHTML=`<div class="mm">
     <svg class="mm-icon" width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 7.523 7.523 12 2 12C7.523 12 12 16.477 12 22C12 16.477 16.477 12 22 12C16.477 12 12 7.523 12 2Z" fill="url(#gG)"/></svg>
@@ -744,7 +788,9 @@ async function stream(txt, myImgs){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}]
+        systemInstruction: { parts: [{ text: "তুমি Close AI, একটি সহায়ক বাংলা AI assistant। সবসময় নির্ভুল, স্পষ্ট ও বিস্তারিত উত্তর দাও। তুমি যে কোনো ধরনের সাহায্য করো। বাংলায় প্রশ্ন করলে বাংলায়, ইংরেজিতে প্রশ্ন করলে ইংরেজিতে উত্তর দাও।" }] },
+        contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}],
+        tools: [{ google_search: {} }] 
       })
     });
 
@@ -803,21 +849,29 @@ async function stream(txt, myImgs){
     if(ty && ty.parentNode) ty.remove();
     
     const cleanImgs = myImgs.map(i => ({ b64: i.b64, mime: i.mime, name: i.name }));
-    const escapedTxt = esc(txt);
-    const jsonImgs = esc(JSON.stringify(cleanImgs));
 
+    // এস্কেপিং বাগ প্রতিরোধের জন্য onclick অ্যাট্রিবিউট ব্যবহার না করে সরাসরি DOM প্রোপার্টি ব্যবহার করা হলো
     te.innerHTML = `
       <div class="err-card">
         <div class="err-msg">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
           <span>${esc(err.message || 'সংযোগ বিচ্ছিন্ন হয়েছে, পুনরায় চেষ্টা করুন')}</span>
         </div>
-        <button class="retry-btn" onclick="manualRetry(this, '${escapedTxt}', '${jsonImgs}')">
+        <button class="retry-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
           Retry
         </button>
       </div>
     `;
+
+    const retryBtn = te.querySelector('.retry-btn');
+    if(retryBtn) {
+      retryBtn._retryTxt = txt;
+      retryBtn._retryImgs = cleanImgs;
+      retryBtn.addEventListener('click', function() {
+        manualRetry(this);
+      });
+    }
 
     if(curId && convos[curId]) {
       if(convos[curId].msgs.length > 0) {
@@ -863,13 +917,22 @@ async function autoTitle(id,txt){
 
 // UI HANDLERS
 function showMsgs(){
-  document.getElementById('welcomeScreen').style.display='none';
-  document.getElementById('msgsWrap').style.display='block';
+  const welcomeScreen = document.getElementById('welcomeScreen');
+  const msgsWrap = document.getElementById('msgsWrap');
+  if(welcomeScreen) welcomeScreen.style.display='none';
+  if(msgsWrap) msgsWrap.style.display='block';
 }
-function cpReply(btn){navigator.clipboard.writeText(btn.closest('.mm-body').querySelector('.mm-txt').innerText).then(()=>toast('✅ কপি হয়েছে'));}
+function cpReply(btn){
+  const textEl = btn.closest('.mm-body').querySelector('.mm-txt');
+  if(textEl) {
+    navigator.clipboard.writeText(textEl.innerText).then(()=>toast('✅ কপি হয়েছে'));
+  }
+}
 function scrollBot(){
   const msgsWrap = document.getElementById('msgsWrap');
-  requestAnimationFrame(()=>msgsWrap.scrollTop=msgsWrap.scrollHeight);
+  if(msgsWrap) {
+    requestAnimationFrame(()=>msgsWrap.scrollTop=msgsWrap.scrollHeight);
+  }
 }
 
 // ═══════════════════════ SIDEBAR HIST & LONG PRESS ═══════════════════════
@@ -954,6 +1017,7 @@ function loadC(id){
   if(!convos[id]) return;
   curId=id; showMsgs(); 
   const msgsInner = document.getElementById('msgsInner');
+  if(!msgsInner) return;
   msgsInner.innerHTML='';
   convos[id].msgs.forEach(m=>{
     if(m.role==='user'){
@@ -983,7 +1047,7 @@ async function delC(id){
   const storageKey = currentUser ? `cai2_convos_${currentUser.id}` : 'cai2_convos_guest';
   localStorage.setItem(storageKey, JSON.stringify(convos));
 
-  if(currentUser && sb) await deleteFromCloud(id);
+  if(currentUser) await deleteFromCloud(id);
   toast('🗑️ চ্যাট ডিলিট করা হয়েছে');
   renderHist();
 }
@@ -997,59 +1061,99 @@ function newChat(){
   if(welcomeScreen) welcomeScreen.style.display='';
   if(msgsWrap) msgsWrap.style.display='none';
   if(msgsInner) msgsInner.innerHTML='';
-  closeSb();renderHist();if(ci) ci.focus();
+  closeSb();renderHist();
+  if(ci) ci.focus();
 }
 
-// 🎯 মার্কডাউন পার্সার
+// 🎯 স্ট্যান্ডার্ড বুলেট এবং নম্বরযুক্ত লিস্ট হ্যান্ডলিং সহ উন্নত মার্কডাউন পার্সার
 function md(t){
   if(!t) return '';
   
+  // ১. কোড ব্লক পার্সিং
   t=t.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>{
     return `<pre><div class="ch"><span class="cl">${lang||'code'}</span><button class="ccb" onclick="cpCode(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> কপি</button></div><code>${esc(code.trim())}</code></pre>`;
   });
   
+  // ২. ইনলাইন কোড এবং বোল্ড/ইটালিক ফরম্যাটিং
   t=t.replace(/`([^`\n]+)`/g,'<code>$1</code>');
   t=t.replace(/\*\*\*([^*]+)\*\*\*/g,'<strong><em>$1</em></strong>');
   t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
   t=t.replace(/\*([^*]+)\*/g,'<em>$1</em>');
   
+  // ৩. হেডার ট্যাগসমূহ
   t=t.replace(/^### (.+)$/gm,'<h3>$1</h3>');
   t=t.replace(/^## (.+)$/gm,'<h2>$1</h2>');
   t=t.replace(/^# (.+)$/gm,'<h1>$1</h1>');
   
-  t=t.replace(/^[•-*] (.+)$/gm,'<li>$1</li>');
-  t=t.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+  // ৪. স্ট্যান্ডার্ড লিস্ট রূপান্তর
+  const lines = t.split('\n');
+  let inUl = false;
+  let inOl = false;
+  let out = [];
   
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const ulMatch = line.match(/^[\*\-•]\s+(.+)$/);
+    const olMatch = line.match(/^(\d+)\.\s+(.+)$/);
+    
+    if (ulMatch) {
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      if (!inUl) { out.push('<ul>'); inUl = true; }
+      out.push(`<li>${ulMatch[1]}</li>`);
+    } else if (olMatch) {
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (!inOl) { out.push('<ol>'); inOl = true; }
+      out.push(`<li>${olMatch[2]}</li>`);
+    } else {
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      out.push(line);
+    }
+  }
+  if (inUl) out.push('</ul>');
+  if (inOl) out.push('</ol>');
+  t = out.join('\n');
+  
+  // ৫. প্যারাগ্রাফ ও লাইন ব্রেক বিন্যাস
   t=t.replace(/\n\n+/g,'</p><p>');
   t=t.replace(/\n/g,'<br>');
   
-  if(!t.startsWith('<p>') && !t.startsWith('<pre>') && !t.startsWith('<h1>') && !t.startsWith('<h2>') && !t.startsWith('<h3>')) {
+  // ব্লক ট্যাগের আশপাশে অযাচিত প্যারাগ্রাফ ট্যাগ পরিমার্জন
+  t = t.replace(/<p>\s*<(ul|ol|pre|h1|h2|h3)/gi, '<$1');
+  t = t.replace(/<\/(ul|ol|pre|h1|h2|h3)>\s*<\/p>/gi, '</$1>');
+  
+  if(!t.startsWith('<p>') && !t.startsWith('<pre>') && !t.startsWith('<h1>') && !t.startsWith('<h2>') && !t.startsWith('<h3>') && !t.startsWith('<ul>') && !t.startsWith('<ol>')) {
     t='<p>'+t+'</p>';
   }
   return t;
 }
 
 function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function cpCode(btn){navigator.clipboard.writeText(btn.closest('pre').querySelector('code').innerText).then(()=>toast('✅ কোড কপি হয়েছে'));}
-function toast(msg){const t=document.getElementById('toast');if(t){t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}}
+function cpCode(btn){
+  const codeEl = btn.closest('pre').querySelector('code');
+  if(codeEl) {
+    navigator.clipboard.writeText(codeEl.innerText).then(()=>toast('✅ কোড কপি হয়েছে'));
+  }
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  if(t) {
+    t.textContent=msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),2200);
+  }
+}
 
 // ═══════════════════════ APP INIT ═══════════════════════
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await checkAuth();
-    if(currentUser){
-      await loadUserConvos();
-    }else{
-      try{ convos=JSON.parse(localStorage.getItem('cai2_convos_guest')||'{}'); }catch(e){convos={};}
-      renderHist();
-    }
-  } catch (err) {
-    console.error("Initialization error:", err);
-    // ব্যাকআপ গেস্ট মোড লোড
+(async function init(){
+  await checkAuth();
+  if(currentUser){
+    await loadUserConvos();
+  }else{
     try{ convos=JSON.parse(localStorage.getItem('cai2_convos_guest')||'{}'); }catch(e){convos={};}
     renderHist();
   }
-});
+})();
 </script>
 </body>
-  </html>
+</html>
