@@ -7,7 +7,8 @@
 <link class="flex-shrink-0" rel="icon" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;600;700&family=Google+Sans+Text:wght@300;400;500;700&family=Google+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- সঠিক UMD ব্রাউজার লাইব্রেরি লিঙ্ক নিচে দেওয়া হলো -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -239,6 +240,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tp);font-
     </button>
     <div class="tb-center">Close AI</div>
     <div class="tb-right">
+      <!-- ৩-ডট বাটনটি সাইডবার মেনু টগল করার জন্য সেট করা -->
       <button class="ib" onclick="toggleSb()" title="হিস্টোরি">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
       </button>
@@ -343,17 +345,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tp);font-
 // ═══════════════════════ SUPABASE SETUP ═══════════════════════
 const supabaseUrl = 'https://weqgzqmeanniynlglhek.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlcWd6cW1lYW5uaXlubGdsaGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNDIzODgsImV4cCI6MjA5ODYxODM4OH0.7YLfbt_oM8RPfBNci3kDjPmPPcQA0iP8px4F_w_-EEs';
-const sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+let sb = null;
+
+// ক্র্যাশ প্রোটেকশনসহ Supabase ক্লায়েন্ট ইনিশিয়ালাইজেশন
+try {
+  if (window.supabase && typeof window.supabase.createClient === 'function') {
+    sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+  }
+} catch (e) {
+  console.error("Supabase client init failed:", e);
+}
+
 let currentUser = null;
 let authMode = 'login';
-
-// ═══════════════════════ SYSTEM PROMPT SETUP ═══════════════════════
-const SYSTEM_PROMPT = `You are Close AI, a highly advanced, ultra-responsive AI assistant. 
-Always adhere to the following strict guidelines:
-- Tone: Helpful, friendly, smart, and concise. Avoid unnecessary preamble.
-- Formatting: Use rich Markdown architecture (bold, code blocks, structured lists, headers) to make responses clean and perfectly scannable.
-- Support: Provide accurate programming scripts, front-end designs, database architectures, and step-by-step technical guides whenever requested.
-- Under no circumstances should you drop or ignore any user instructions. Balance all constraints efficiently.`;
 
 // ═══════════════════════ GEMINI ROUTER ENDPOINTS ═══════════════════════
 const SURL = `/api/gemini?mode=stream`;
@@ -399,13 +403,22 @@ function updateAuthUI(){
 }
 
 async function checkAuth(){
-  const {data:{user}}=await sb.auth.getUser();
-  currentUser=user;
-  updateAuthUI();
+  if(!sb) return;
+  try {
+    const {data:{user}}=await sb.auth.getUser();
+    currentUser=user;
+    updateAuthUI();
+  } catch(e) {
+    console.error("Auth check failed:", e);
+  }
 }
 
 async function handleAuth(){
   closeSb();
+  if(!sb) {
+    toast("⚠️ ডেটাবেজ সংযোগ বিচ্ছিন্ন! গেস্ট মোড সক্রিয়।");
+    return;
+  }
   if(currentUser){
     if(!confirm('আপনি কি লগ আউট করতে চান?'))return;
     await sb.auth.signOut();
@@ -437,6 +450,7 @@ function switchAuthTab(mode){
 }
 
 async function submitEmailAuth(){
+  if(!sb) return;
   const email=document.getElementById('authEmail').value.trim();
   const pass=document.getElementById('authPass').value;
   const errEl=document.getElementById('authErr');
@@ -467,22 +481,25 @@ async function submitEmailAuth(){
 }
 
 async function googleAuth(){
+  if(!sb) return;
   const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.href}});
   if(error)alert('Google লগইন সমস্যা: '+error.message);
 }
 
-sb.auth.onAuthStateChange(async (_event,session)=>{
-  const wasLoggedIn=!!currentUser;
-  currentUser=session?.user||null;
-  updateAuthUI();
-  if(currentUser&&!wasLoggedIn){
-    closeAuthModal();
-    document.getElementById('authEmail').value='';
-    document.getElementById('authPass').value='';
-    await loadUserConvos();
-    toast('লগইন হয়েছে');
-  }
-});
+if(sb) {
+  sb.auth.onAuthStateChange(async (_event,session)=>{
+    const wasLoggedIn=!!currentUser;
+    currentUser=session?.user||null;
+    updateAuthUI();
+    if(currentUser&&!wasLoggedIn){
+      closeAuthModal();
+      document.getElementById('authEmail').value='';
+      document.getElementById('authPass').value='';
+      await loadUserConvos();
+      toast('লগইন হয়েছে');
+    }
+  });
+}
 
 // ═══════════════════════ DUAL SYNC LOGIC ═══════════════════════
 async function save(){
@@ -493,13 +510,13 @@ async function save(){
   if(k.length>100) k.slice(0,k.length-100).forEach(x=>delete convos[x]);
   localStorage.setItem(storageKey, JSON.stringify(convos));
 
-  if(currentUser){
+  if(currentUser && sb){
     await saveToCloud(curId);
   }
 }
 
 async function saveToCloud(id){
-  if(!currentUser||!convos[id])return;
+  if(!currentUser||!convos[id]||!sb)return;
   try{
     await sb.from('conversations').upsert({
       id:id,
@@ -512,12 +529,12 @@ async function saveToCloud(id){
 }
 
 async function deleteFromCloud(id){
-  if(!currentUser)return;
+  if(!currentUser||!sb)return;
   try{await sb.from('conversations').delete().eq('id',id).eq('user_id',currentUser.id);}catch(e){console.error(e);}
 }
 
 async function loadUserConvos(){
-  if(!currentUser) return;
+  if(!currentUser||!sb) return;
   const storageKey = `cai2_convos_${currentUser.id}`;
   
   const localBackup = localStorage.getItem(storageKey);
@@ -666,7 +683,6 @@ async function manualRetry(btn, oldTxt, oldImgsJson){
   const card = btn.closest('.mb');
   if(card) card.remove();
   
-  // যদি পূর্বের এররের কারণে চ্যাট মেমোরি থেকে সম্পূর্ণ ডিলিট হয়ে গিয়ে থাকে, তবে নতুন করে তৈরি হবে
   if(!curId || !convos[curId]) {
     curId = 'c'+Date.now();
     convos[curId] = {title:'...', msgs:[]};
@@ -677,7 +693,6 @@ async function manualRetry(btn, oldTxt, oldImgsJson){
     addUMsg(oldTxt, uiImgs);
   }
   
-  // মেমোরিতে প্রশ্নটি আবার পুশ করা হলো, তবে ভিজ্যুয়াল ডুপ্লিকেট এড়াতে পুনরায় addUMsg করা হবে না
   convos[curId].msgs.push({
     role:'user',
     text:oldTxt,
@@ -729,9 +744,7 @@ async function stream(txt, myImgs){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        systemInstruction: { parts: [{ text: "তুমি Close AI, একটি সহায়ক বাংলা AI assistant। সবসময় নির্ভুল, স্পষ্ট ও বিস্তারিত উত্তর দাও। তুমি যে কোনো ধরনের সাহায্য করো। বাংলায় প্রশ্ন করলে বাংলায়, ইংরেজিতে প্রশ্ন করলে ইংরেজিতে উত্তর দাও।" }] },
-        contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}],
-        tools: [{ google_search: {} }] 
+        contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}]
       })
     });
 
@@ -806,14 +819,12 @@ async function stream(txt, myImgs){
       </div>
     `;
 
-    // মেমোরি থেকে ব্যর্থ হওয়া শেষ প্রশ্নটি রিমুভ করা এবং লোকাল/ক্লাউড সম্পূর্ণরূপে সিঙ্ক করার নিখুঁত মেকানিজম:
     if(curId && convos[curId]) {
       if(convos[curId].msgs.length > 0) {
         convos[curId].msgs.pop();
       }
       
       if(convos[curId].msgs.length === 0) {
-        // চ্যাটটি একেবারে নতুন হলে ডাটাবেজ এবং লোকাল থেকে সম্পূর্ণ মুছে ফেলা হবে
         const oldId = curId;
         delete convos[curId];
         curId = null;
@@ -825,7 +836,6 @@ async function stream(txt, myImgs){
           await deleteFromCloud(oldId);
         }
       } else {
-        // চ্যাটটি পুরনো হলে শেষ অসম্পূর্ণ প্রশ্নটি বাদ দিয়ে আগের অবস্থায় সেভ (লোকাল ও ক্লাউড সিঙ্ক) করে দেওয়া হবে
         await save();
       }
     }
@@ -865,6 +875,7 @@ function scrollBot(){
 // ═══════════════════════ SIDEBAR HIST & LONG PRESS ═══════════════════════
 function renderHist(){
   const histList = document.getElementById('histList');
+  if(!histList) return;
   const keys=Object.keys(convos).reverse();
   if(!keys.length){histList.innerHTML='<div style="padding:12px 16px;font-size:13px;color:var(--td)">কোনো চ্যাট নেই</div>';return;}
   
@@ -932,7 +943,7 @@ async function renameC(id, newTitle) {
   const storageKey = currentUser ? `cai2_convos_${currentUser.id}` : 'cai2_convos_guest';
   localStorage.setItem(storageKey, JSON.stringify(convos));
 
-  if(currentUser) {
+  if(currentUser && sb) {
     try { await sb.from('conversations').update({ title: newTitle, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id); } catch(e) { console.error(e); }
   }
   toast('✅ রিনেম সফল হয়েছে');
@@ -972,7 +983,7 @@ async function delC(id){
   const storageKey = currentUser ? `cai2_convos_${currentUser.id}` : 'cai2_convos_guest';
   localStorage.setItem(storageKey, JSON.stringify(convos));
 
-  if(currentUser) await deleteFromCloud(id);
+  if(currentUser && sb) await deleteFromCloud(id);
   toast('🗑️ চ্যাট ডিলিট করা হয়েছে');
   renderHist();
 }
@@ -983,8 +994,10 @@ function newChat(){
   const msgsInner = document.getElementById('msgsInner');
   const ci = document.getElementById('ci');
   curId=null;imgs=[];renderImgs();
-  welcomeScreen.style.display='';msgsWrap.style.display='none';msgsInner.innerHTML='';
-  closeSb();renderHist();ci.focus();
+  if(welcomeScreen) welcomeScreen.style.display='';
+  if(msgsWrap) msgsWrap.style.display='none';
+  if(msgsInner) msgsInner.innerHTML='';
+  closeSb();renderHist();if(ci) ci.focus();
 }
 
 // 🎯 মার্কডাউন পার্সার
@@ -1018,18 +1031,25 @@ function md(t){
 
 function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function cpCode(btn){navigator.clipboard.writeText(btn.closest('pre').querySelector('code').innerText).then(()=>toast('✅ কোড কপি হয়েছে'));}
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function toast(msg){const t=document.getElementById('toast');if(t){t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}}
 
 // ═══════════════════════ APP INIT ═══════════════════════
-(async function init(){
-  await checkAuth();
-  if(currentUser){
-    await loadUserConvos();
-  }else{
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await checkAuth();
+    if(currentUser){
+      await loadUserConvos();
+    }else{
+      try{ convos=JSON.parse(localStorage.getItem('cai2_convos_guest')||'{}'); }catch(e){convos={};}
+      renderHist();
+    }
+  } catch (err) {
+    console.error("Initialization error:", err);
+    // ব্যাকআপ গেস্ট মোড লোড
     try{ convos=JSON.parse(localStorage.getItem('cai2_convos_guest')||'{}'); }catch(e){convos={};}
     renderHist();
   }
-})();
+});
 </script>
 </body>
   </html>
