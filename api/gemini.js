@@ -1,11 +1,13 @@
 export const config = { runtime: 'edge' };
 
-const DAILY_SEARCH_LIMIT = 250;
+// দৈনিক সার্চ লিমিট ২৫০
+const DAILY_SEARCH_LIMIT = 250; 
 
 async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
   const today = new Date().toISOString().slice(0, 10);
   try {
-    const checkUrl = `\( {supabaseUrl}/rest/v1/search_usage?usage_date=eq. \){today}`;
+    // ১. প্রথমে আজকের দিনের ডেটা চেক করা হচ্ছে
+    const checkUrl = `${supabaseUrl}/rest/v1/search_usage?usage_date=eq.${today}`;
     const res = await fetch(checkUrl, {
       headers: { 
         'apikey': supabaseServiceKey, 
@@ -15,15 +17,20 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
     
     const rows = await res.json();
     let currentCount = 0;
+    let hasRow = false;
+
     if (Array.isArray(rows) && rows.length > 0) {
       currentCount = parseInt(rows[0].count, 10) || 0;
+      hasRow = true;
     }
     
+    // লিমিট ক্রস হলে সার্চ বন্ধ
     if (currentCount >= DAILY_SEARCH_LIMIT) {
-      console.log(`[Search Limit] Daily limit reached (\( {currentCount}/ \){DAILY_SEARCH_LIMIT})`);
-      return false;
+      console.log(`[Search Limit] Daily limit reached (${currentCount}).`);
+      return false; 
     }
 
+    // ২. ডেটাবেজে কাউন্ট ১ বাড়িয়ে সেভ বা আপডেট করা হচ্ছে
     const upsertUrl = `${supabaseUrl}/rest/v1/search_usage`;
     await fetch(upsertUrl, {
       method: 'POST',
@@ -31,15 +38,16 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
         'apikey': supabaseServiceKey,
         'Authorization': `Bearer ${supabaseServiceKey}`,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates, return=minimal'
+        // merge-duplicates কাজ করার জন্য টেবিলে 'usage_date' কে PRIMARY KEY হতে হবে
+        'Prefer': 'resolution=merge-duplicates, return=minimal' 
       },
       body: JSON.stringify({ usage_date: today, count: currentCount + 1 })
     });
 
-    return true;
+    return true; 
   } catch (e) {
     console.error('Supabase Tracking Error:', e);
-    return true;
+    return true; // এরর হলেও ইউজার যেন এআই রেসপন্স পায়, তাই true রিটার্ন করা হচ্ছে
   }
 }
 
@@ -66,19 +74,21 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: { message: 'Invalid JSON' } }), { status: 400 });
   }
 
-  // Google Search Tool লজিক
+  // 🤖 স্মার্ট অটো-সার্চ লজিক
   if (supabaseUrl && supabaseServiceKey) {
     const canSearch = await checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey);
     if (canSearch) {
-      jsonBody.tools = [{ googleSearch: {} }];
+      jsonBody.tools = [{ googleSearch: {} }]; 
     } else {
+      // লিমিট শেষ হলে রিকোয়েস্ট থেকে tools অবজেক্টটি ডিলিট করে দেওয়া হবে
       delete jsonBody.tools;
     }
   }
 
+  // Gemini মডেল এবং এন্ডপয়েন্ট সেটআপ
   const model = 'gemini-2.5-flash';
   const endpoint = mode === 'stream' ? 'streamGenerateContent' : 'generateContent';
-  const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/\( {model}: \){endpoint}?key=\( {apiKey} \){mode === 'stream' ? '&alt=sse' : ''}`;
+  const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}${mode === 'stream' ? '&alt=sse' : ''}`;
 
   try {
     const geminiRes = await fetch(targetUrl, {
@@ -87,10 +97,25 @@ export default async function handler(req) {
       body: JSON.stringify(jsonBody)
     });
 
-    return geminiRes;   // Vercel Edge-এ সরাসরি রিটার্ন করা সবচেয়ে ভালো
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      return new Response(errText, { status: geminiRes.status, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // ✅ এখানে `printable` পরিবর্তন করে `readable` করা হয়েছে (মূল বাগ ফিক্স)
+    const { readable, writable } = new TransformStream();
+    geminiRes.body.pipeTo(writable);
+
+    return new Response(readable, {
+      status: geminiRes.status,
+      headers: {
+        'Content-Type': mode === 'stream' ? 'text/event-stream' : 'application/json',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      }
+    });
 
   } catch (error) {
-    console.error("Proxy Error:", error);
     return new Response(JSON.stringify({ error: { message: error.message } }), { status: 500 });
   }
 }
