@@ -86,7 +86,7 @@ export default async function handler(req) {
   }
 
   // Gemini মডেল এবং এন্ডপয়েন্ট সেটআপ
-  const model = 'gemini-3-flash-preview';
+  const model = '​gemini-3.5-flash';
   const endpoint = mode === 'stream' ? 'streamGenerateContent' : 'generateContent';
   const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}${mode === 'stream' ? '&alt=sse' : ''}`;
 
