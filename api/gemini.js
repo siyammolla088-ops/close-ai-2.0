@@ -1,7 +1,7 @@
 export const config = { runtime: 'edge' };
 
 // দৈনিক সার্চ লিমিট ২৫০
-const DAILY_SEARCH_LIMIT = 250; 
+const DAILY_SEARCH_LIMIT = 100; 
 
 async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
   const today = new Date().toISOString().slice(0, 10);
@@ -86,7 +86,7 @@ export default async function handler(req) {
   }
 
   // Gemini মডেল এবং এন্ডপয়েন্ট সেটআপ
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-3-flash-preview';
   const endpoint = mode === 'stream' ? 'streamGenerateContent' : 'generateContent';
   const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}${mode === 'stream' ? '&alt=sse' : ''}`;
 
