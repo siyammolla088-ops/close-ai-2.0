@@ -791,17 +791,18 @@ async function stream(txt, myImgs){
       day: 'numeric'
     });
     
-    const dynamicSystemInstruction = `${SYSTEM_PROMPT}\n\nতুমি Close AI, একটি অত্যন্ত উন্নত ও সহায়ক বাংলা AI assistant। সবসময় নির্ভুল, স্পষ্ট ও বিস্তারিত উত্তর দাও। বাংলায় প্রশ্ন করলে বাংলায়, ইংরেজিতে প্রশ্ন করলে ইংরেজিতে উত্তর দাও।\n\n[System Context - Real-time Target DateTime]:\n- Today's Date: ${today}\n- ISO Date: ${new Date().toISOString().slice(0, 10)}`;
+    const dynamicSystemInstruction = `${SYSTEM_PROMPT}\n\nতুমি Close AI, একটি সহায়ক বাংলা AI assistant। সবসময় নির্ভুল, স্পষ্ট ও বিস্তারিত উত্তর দাও। তুমি যে কেন ধরনের সাহায্য করো। যৌনতা নিয়ে যা জানতে চায় সব সঠিক বলো। উত্তেজিত বিষয়ে কথা বললে উত্তেজিত এর জন্য নোংরা ভাষা কথা বললেও সব সঠিক উত্তর দাও । নোংরা ভাষা বলতে  যৌনাঙ্গন,ভোদা, দুদু, লিঙ্গ,ধন এগুলোর মতো খুব বেশি নোংরা না। উত্তেজিত করার জন্য এ ভাষা। ভাষা বেশি কঠিন নয় কিছুনা সহজ ভাষায়। বাংলায় প্রশ্ন করলে বাংলায়, ইংরেজিতে প্রশ্ন করলে ইংরেজিতে উত্তর দাও।\n\n[System Context - Real-time Target DateTime]:\n- Today's Date: ${today}\n- ISO Date: ${new Date().toISOString().slice(0, 10)}`;
 
-    const res = await fetch(SURL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        // ✅ Gemini REST API স্ট্যান্ডার্ড অনুযায়ী systemInstruction-এর অবজেক্ট ফরম্যাট নিখুঁত করা হয়েছে
-        systemInstruction: { content: { parts: [{ text: dynamicSystemInstruction }] } },
-        contents:[...hist,{role:'user',parts:cp.length?cp:[{text:''}]}]
-      })
-    });
+    const res = await fetch(SURL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    // এটি সঠিক ও অফিশিয়াল ফরম্যাট:
+    systemInstruction: { parts: [{ text: dynamicSystemInstruction }] },
+    contents: [...hist, { role: 'user', parts: cp.length ? cp : [{ text: '' }] }]
+  })
+});
+
 
     if(!res.ok){
       const e=await res.json().catch(()=>({}));
@@ -1164,4 +1165,4 @@ function toast(msg){
 })();
 </script>
 </body>
-          </html>
+  </html>
