@@ -1,11 +1,9 @@
 export const config = { runtime: 'edge' };
 
-// দৈনিক Google Search লিমিট (তোমার পছন্দ অনুসারে 100 রাখলাম)
-const DAILY_SEARCH_LIMIT = 100;
+const DAILY_SEARCH_LIMIT = 250;
 
 async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
   const today = new Date().toISOString().slice(0, 10);
-  
   try {
     const checkUrl = `\( {supabaseUrl}/rest/v1/search_usage?usage_date=eq. \){today}`;
     const res = await fetch(checkUrl, {
@@ -17,13 +15,12 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
     
     const rows = await res.json();
     let currentCount = 0;
-
     if (Array.isArray(rows) && rows.length > 0) {
       currentCount = parseInt(rows[0].count, 10) || 0;
     }
     
     if (currentCount >= DAILY_SEARCH_LIMIT) {
-      console.log(`[Search Limit] Daily limit reached (\( {currentCount}/ \){DAILY_SEARCH_LIMIT})`);
+      console.log(`[Search Limit] Daily limit reached (${currentCount})`);
       return false;
     }
 
@@ -36,16 +33,13 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
         'Content-Type': 'application/json',
         'Prefer': 'resolution=merge-duplicates, return=minimal'
       },
-      body: JSON.stringify({ 
-        usage_date: today, 
-        count: currentCount + 1 
-      })
+      body: JSON.stringify({ usage_date: today, count: currentCount + 1 })
     });
 
     return true;
   } catch (e) {
     console.error('Supabase Tracking Error:', e);
-    return true; // এরর হলেও চালিয়ে যাবে
+    return true;
   }
 }
 
@@ -72,7 +66,6 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: { message: 'Invalid JSON' } }), { status: 400 });
   }
 
-  // Google Search লিমিট চেক + টুল যোগ করা
   if (supabaseUrl && supabaseServiceKey) {
     const canSearch = await checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey);
     if (canSearch) {
@@ -82,10 +75,7 @@ export default async function handler(req) {
     }
   }
 
-  // ==================== মডেল ====================
-  const model = 'gemini-2.5-flash';           // এখন 2.5 Flash ব্যবহার করছো
-  // const model = 'gemini-3.0-flash-preview-0625';  // পরে Gemini 3 ব্যবহার করতে চাইলে এটা চালু করো
-
+  const model = 'gemini-2.5-flash';
   const endpoint = mode === 'stream' ? 'streamGenerateContent' : 'generateContent';
   const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/\( {model}: \){endpoint}?key=\( {apiKey} \){mode === 'stream' ? '&alt=sse' : ''}`;
 
@@ -96,19 +86,10 @@ export default async function handler(req) {
       body: JSON.stringify(jsonBody)
     });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini API Error:", errText);
-      return new Response(errText, { 
-        status: geminiRes.status,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
     return geminiRes;
 
   } catch (error) {
     console.error("Proxy Error:", error);
-    return new Response(JSON.stringify({ error: { message: 'Proxy error: ' + error.message } }), { status: 500 });
+    return new Response(JSON.stringify({ error: { message: error.message } }), { status: 500 });
   }
 }
