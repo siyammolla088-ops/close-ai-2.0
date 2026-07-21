@@ -20,7 +20,7 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
     }
     
     if (currentCount >= DAILY_SEARCH_LIMIT) {
-      console.log(`[Search Limit] Daily limit reached (${currentCount})`);
+      console.log(`[Search Limit] Daily limit reached (\( {currentCount}/ \){DAILY_SEARCH_LIMIT})`);
       return false;
     }
 
@@ -66,6 +66,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: { message: 'Invalid JSON' } }), { status: 400 });
   }
 
+  // Google Search Tool লজিক
   if (supabaseUrl && supabaseServiceKey) {
     const canSearch = await checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey);
     if (canSearch) {
@@ -86,7 +87,7 @@ export default async function handler(req) {
       body: JSON.stringify(jsonBody)
     });
 
-    return geminiRes;
+    return geminiRes;   // Vercel Edge-এ সরাসরি রিটার্ন করা সবচেয়ে ভালো
 
   } catch (error) {
     console.error("Proxy Error:", error);
