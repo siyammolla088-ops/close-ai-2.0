@@ -17,11 +17,9 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
     
     const rows = await res.json();
     let currentCount = 0;
-    let hasRow = false;
 
     if (Array.isArray(rows) && rows.length > 0) {
       currentCount = parseInt(rows[0].count, 10) || 0;
-      hasRow = true;
     }
     
     // লিমিট ক্রস হলে সার্চ বন্ধ
@@ -38,7 +36,6 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
         'apikey': supabaseServiceKey,
         'Authorization': `Bearer ${supabaseServiceKey}`,
         'Content-Type': 'application/json',
-        // merge-duplicates কাজ করার জন্য টেবিলে 'usage_date' কে PRIMARY KEY হতে হবে
         'Prefer': 'resolution=merge-duplicates, return=minimal' 
       },
       body: JSON.stringify({ usage_date: today, count: currentCount + 1 })
@@ -47,7 +44,7 @@ async function checkAndIncrementSearchUsage(supabaseUrl, supabaseServiceKey) {
     return true; 
   } catch (e) {
     console.error('Supabase Tracking Error:', e);
-    return true; // এরর হলেও ইউজার যেন এআই রেসপন্স পায়, তাই true রিটার্ন করা হচ্ছে
+    return true; // এরর হলেও ইউজার যেন এআই রেসপন্স পায়
   }
 }
 
@@ -80,7 +77,6 @@ export default async function handler(req) {
     if (canSearch) {
       jsonBody.tools = [{ googleSearch: {} }]; 
     } else {
-      // লিমিট শেষ হলে রিকোয়েস্ট থেকে tools অবজেক্টটি ডিলিট করে দেওয়া হবে
       delete jsonBody.tools;
     }
   }
@@ -102,7 +98,7 @@ export default async function handler(req) {
       return new Response(errText, { status: geminiRes.status, headers: { 'Content-Type': 'application/json' } });
     }
 
-    // ✅ এখানে `printable` পরিবর্তন করে `readable` করা হয়েছে (মূল বাগ ফিক্স)
+    // Streams Response Output Fix
     const { readable, writable } = new TransformStream();
     geminiRes.body.pipeTo(writable);
 
